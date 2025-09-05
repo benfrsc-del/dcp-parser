@@ -1332,15 +1332,8 @@
                                 
                                 logMessage(`Page ${pageNum}: Text length after normalization: ${pageText.length}`, 'info');
 
-                                // Check if OCR is needed
-                                if (await needsOCR(page)) {
-                                    const ocrResult = await performOCR(page);
-                                    if (ocrResult.confidence > parserConfig.ocrThreshold) {
-                                        pageText = ocrResult.text;
-                                        ocrPages++;
-                                        logMessage(`Page ${pageNum}: OCR used (confidence: ${ocrResult.confidence})`, 'info');
-                                    }
-                                }
+                                // OCR is disabled in this version
+                                // if (await needsOCR(page)) { ... }
 
                                 // Track sections across pages
                                 const sectionMatch = pageText.match(/^(\d+(?:\.\d+)*)\s+(.+?)$/m);

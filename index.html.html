@@ -1090,7 +1090,7 @@
             return endIndicators.some(pattern => pattern.test(line.text));
         }
 
-        // OCR Functions
+        // OCR Functions (simplified without Tesseract dependency)
         async function needsOCR(page) {
             const textContent = await page.getTextContent();
             const textLength = textContent.items.reduce((sum, item) => sum + item.str.length, 0);
@@ -1101,40 +1101,14 @@
 
         async function performOCR(page) {
             try {
-                logMessage('Performing OCR on low-text page...', 'info');
+                logMessage('Low-text page detected - OCR functionality disabled in this version', 'warning');
                 
-                const viewport = page.getViewport({ scale: 2.0 });
-                const canvas = document.createElement('canvas');
-                const context = canvas.getContext('2d');
-                canvas.height = viewport.height;
-                canvas.width = viewport.width;
-                
-                const renderContext = {
-                    canvasContext: context,
-                    viewport: viewport
+                // For now, return empty result since Tesseract.js was causing issues
+                // In a production environment, you would implement server-side OCR
+                return { 
+                    text: '', 
+                    confidence: 0 
                 };
-                
-                await page.render(renderContext).promise;
-                
-                const imageData = canvas.toDataURL('image/png');
-                
-                if (typeof Tesseract !== 'undefined') {
-                    const result = await Tesseract.recognize(imageData, 'eng', {
-                        logger: m => {
-                            if (m.status === 'recognizing text') {
-                                logMessage(`OCR Progress: ${Math.round(m.progress * 100)}%`, 'info');
-                            }
-                        }
-                    });
-                    
-                    return {
-                        text: result.data.text,
-                        confidence: result.data.confidence
-                    };
-                } else {
-                    logMessage('Tesseract.js not available for OCR', 'warning');
-                    return { text: '', confidence: 0 };
-                }
                 
             } catch (error) {
                 logMessage(`OCR failed: ${error.message}`, 'error');

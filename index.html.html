@@ -3,8 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DCP Parser - AI-Ready Format Converter</title>
+    <title>DCP Parser - Advanced Text Extraction</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/4.1.1/tesseract.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -20,7 +21,7 @@
         }
 
         .container {
-            max-width: 1200px;
+            max-width: 1400px;
             margin: 0 auto;
             background: rgba(255, 255, 255, 0.95);
             backdrop-filter: blur(10px);
@@ -47,9 +48,36 @@
         .header p {
             font-size: 1.1rem;
             color: #666;
-            max-width: 600px;
+            max-width: 700px;
             margin: 0 auto;
             line-height: 1.6;
+        }
+
+        .config-section {
+            background: #e3f2fd;
+            border: 1px solid #90caf9;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 30px;
+        }
+
+        .config-section h3 {
+            color: #1565c0;
+            margin-bottom: 15px;
+        }
+
+        .config-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+
+        .config-input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 0.9rem;
         }
 
         .api-section {
@@ -72,11 +100,6 @@
             border-radius: 8px;
             font-size: 1rem;
             margin-bottom: 10px;
-        }
-
-        .api-note {
-            font-size: 0.9rem;
-            color: #856404;
         }
 
         .upload-section {
@@ -186,7 +209,7 @@
             border: 1px solid #dee2e6;
             border-radius: 8px;
             padding: 15px;
-            max-height: 200px;
+            max-height: 250px;
             overflow-y: auto;
             font-family: 'Courier New', monospace;
             font-size: 0.85rem;
@@ -220,6 +243,67 @@
             border-radius: 15px;
             padding: 30px;
             box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #ff6b6b, #ee5a24);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 2rem;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+
+        .qa-section {
+            background: #fff8e1;
+            border: 1px solid #ffcc02;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+
+        .qa-section h3 {
+            color: #f57f17;
+            margin-bottom: 15px;
+        }
+
+        .low-confidence-items {
+            max-height: 200px;
+            overflow-y: auto;
+            background: #fafafa;
+            border-radius: 8px;
+            padding: 15px;
+        }
+
+        .confidence-item {
+            background: white;
+            border-left: 4px solid #ff9800;
+            padding: 10px;
+            margin-bottom: 10px;
+            border-radius: 0 5px 5px 0;
+            font-size: 0.9rem;
+        }
+
+        .confidence-score {
+            font-weight: bold;
+            color: #e65100;
         }
 
         .output-tabs {
@@ -294,32 +378,6 @@
             box-shadow: 0 5px 15px rgba(40, 167, 69, 0.4);
         }
 
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 20px;
-            margin-bottom: 30px;
-        }
-
-        .stat-card {
-            background: linear-gradient(135deg, #ff6b6b, #ee5a24);
-            color: white;
-            padding: 20px;
-            border-radius: 10px;
-            text-align: center;
-        }
-
-        .stat-number {
-            font-size: 2rem;
-            font-weight: bold;
-            margin-bottom: 5px;
-        }
-
-        .stat-label {
-            font-size: 0.9rem;
-            opacity: 0.9;
-        }
-
         .control-buttons {
             text-align: center;
             margin-top: 30px;
@@ -369,15 +427,37 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>DCP Parser</h1>
-            <p>Transform Development Control Plans into AI-ready formats with iterative page-by-page processing. Upload your PDF documents and get comprehensive structured JSON, XML, and vector embeddings.</p>
+            <h1>Advanced DCP Parser</h1>
+            <p>Professional-grade Development Control Plan parser with coordinate-based text reconstruction, table detection, OCR fallback, and comprehensive rule extraction. Handles complex layouts, spaced capitals, and multi-column zone tables.</p>
+        </div>
+
+        <div class="config-section">
+            <h3>Parser Configuration</h3>
+            <div class="config-grid">
+                <div>
+                    <label>Y-Position Tolerance (px):</label>
+                    <input type="number" id="yTolerance" class="config-input" value="3" min="1" max="10">
+                </div>
+                <div>
+                    <label>Column Gap Threshold (px):</label>
+                    <input type="number" id="columnGap" class="config-input" value="20" min="5" max="100">
+                </div>
+                <div>
+                    <label>OCR Confidence Threshold:</label>
+                    <input type="number" id="ocrThreshold" class="config-input" value="60" min="0" max="100">
+                </div>
+                <div>
+                    <label>Min Rule Confidence:</label>
+                    <input type="number" id="minConfidence" class="config-input" value="0.5" min="0" max="1" step="0.1">
+                </div>
+            </div>
         </div>
 
         <div class="api-section">
             <h3>OpenAI Integration (Optional)</h3>
             <input type="password" id="apiKey" class="api-input" placeholder="Enter your OpenAI API key (sk-...)">
             <div class="api-note">
-                API key is used only for generating real vector embeddings. Without it, simulated embeddings will be created.
+                API key is used for generating vector embeddings from extracted rules and clean section summaries.
             </div>
         </div>
 
@@ -387,7 +467,7 @@
                 <label for="fileInput" class="file-input-label">
                     Select DCP Files or Drag & Drop
                 </label>
-                <p style="margin-top: 15px; color: #666;">Supports PDF files up to 50MB each</p>
+                <p style="margin-top: 15px; color: #666;">Supports PDF files with text and scanned images</p>
             </div>
             <div class="file-status" id="fileStatus"></div>
         </div>
@@ -415,39 +495,52 @@
                     <div class="stat-label">Pages Processed</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-number" id="statSections">0</div>
-                    <div class="stat-label">Sections Found</div>
-                </div>
-                <div class="stat-card">
                     <div class="stat-number" id="statRules">0</div>
                     <div class="stat-label">Development Rules</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="statTables">0</div>
+                    <div class="stat-label">Tables Detected</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-number" id="statZones">0</div>
                     <div class="stat-label">Zoning Areas</div>
                 </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="statConfidence">0</div>
+                    <div class="stat-label">Avg Confidence</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="statOCRPages">0</div>
+                    <div class="stat-label">OCR Pages</div>
+                </div>
+            </div>
+
+            <div class="qa-section" id="qaSection" style="display: none;">
+                <h3>Quality Assurance - Low Confidence Items</h3>
+                <div class="low-confidence-items" id="lowConfidenceItems"></div>
             </div>
 
             <div class="output-tabs">
-                <button class="tab-button active" onclick="showTab('json')">JSON Output</button>
-                <button class="tab-button" onclick="showTab('xml')">XML Output</button>
+                <button class="tab-button active" onclick="showTab('rules')">Extracted Rules</button>
+                <button class="tab-button" onclick="showTab('json')">Full JSON</button>
                 <button class="tab-button" onclick="showTab('summary')">Summary</button>
                 <button class="tab-button" onclick="showTab('embeddings')">Vector Data</button>
             </div>
 
-            <div class="output-content active" id="jsonOutput">
-                <h3>Structured JSON Format</h3>
-                <div class="code-block" id="jsonCode"></div>
+            <div class="output-content active" id="rulesOutput">
+                <h3>Extracted Development Rules</h3>
+                <div class="code-block" id="rulesCode"></div>
                 <div class="download-buttons">
-                    <button class="download-btn" onclick="downloadFile('json')">Download JSON</button>
+                    <button class="download-btn" onclick="downloadFile('rules')">Download Rules JSON</button>
                 </div>
             </div>
 
-            <div class="output-content" id="xmlOutput">
-                <h3>XML Schema Format</h3>
-                <div class="code-block" id="xmlCode"></div>
+            <div class="output-content" id="jsonOutput">
+                <h3>Complete Structured JSON</h3>
+                <div class="code-block" id="jsonCode"></div>
                 <div class="download-buttons">
-                    <button class="download-btn" onclick="downloadFile('xml')">Download XML</button>
+                    <button class="download-btn" onclick="downloadFile('json')">Download Full JSON</button>
                 </div>
             </div>
 
@@ -482,15 +575,102 @@
 
         let processedData = {};
         let processingCancelled = false;
+        let parserConfig = {
+            yTolerance: 3,
+            columnGap: 20,
+            ocrThreshold: 60,
+            minConfidence: 0.5
+        };
 
-        // Check if PDF.js loaded
-        window.addEventListener('load', function() {
-            if (typeof pdfjsLib === 'undefined') {
-                showFileStatus('PDF.js library failed to load. Please check your internet connection.', 'error');
-            } else {
-                logMessage('PDF.js loaded successfully', 'success');
+        // Configuration for planning controls
+        const PLANNING_CONTROLS = {
+            'landscaped_area': {
+                patterns: [
+                    /landscap(?:ed?|ing)\s*area/i,
+                    /landscape\s*(?:provision|requirement)/i,
+                    /soft\s*landscap/i
+                ],
+                units: ['%', 'percent', 'm²', 'sqm'],
+                comparators: ['≥', '>=', 'minimum', 'min', 'at least']
+            },
+            'deep_soil': {
+                patterns: [
+                    /deep\s*soil/i,
+                    /deep\s*soil\s*zone/i,
+                    /deep\s*soil\s*area/i
+                ],
+                units: ['%', 'percent', 'm²', 'sqm'],
+                comparators: ['≥', '>=', 'minimum', 'min', 'at least']
+            },
+            'site_coverage': {
+                patterns: [
+                    /site\s*coverage/i,
+                    /building\s*coverage/i,
+                    /lot\s*coverage/i,
+                    /coverage\s*ratio/i
+                ],
+                units: ['%', 'percent'],
+                comparators: ['≤', '<=', 'maximum', 'max', 'not exceed', 'no more than']
+            },
+            'building_height': {
+                patterns: [
+                    /building\s*height/i,
+                    /maximum\s*height/i,
+                    /height\s*limit/i,
+                    /height\s*control/i
+                ],
+                units: ['m', 'metres', 'meters', 'storeys', 'storey', 'floors', 'floor'],
+                comparators: ['≤', '<=', 'maximum', 'max', 'not exceed', 'no more than']
+            },
+            'fsr': {
+                patterns: [
+                    /floor\s*space\s*ratio/i,
+                    /FSR/,
+                    /gross\s*floor\s*area/i,
+                    /GFA/
+                ],
+                units: [':1', 'ratio'],
+                comparators: ['≤', '<=', 'maximum', 'max', 'not exceed']
+            },
+            'setbacks': {
+                patterns: [
+                    /(?:front|rear|side|boundary)\s*setback/i,
+                    /building\s*separation/i,
+                    /minimum\s*distance/i
+                ],
+                units: ['m', 'metres', 'meters'],
+                comparators: ['≥', '>=', 'minimum', 'min', 'at least']
+            },
+            'private_open_space': {
+                patterns: [
+                    /private\s*open\s*space/i,
+                    /POS/,
+                    /outdoor\s*space/i,
+                    /balcony\s*area/i
+                ],
+                units: ['m²', 'sqm', '%', 'percent'],
+                comparators: ['≥', '>=', 'minimum', 'min', 'at least']
+            },
+            'parking': {
+                patterns: [
+                    /car\s*parking/i,
+                    /vehicle\s*parking/i,
+                    /parking\s*space/i,
+                    /parking\s*requirement/i
+                ],
+                units: ['spaces', 'space', 'per dwelling', 'per unit'],
+                comparators: ['≥', '>=', 'minimum', 'min', 'at least']
             }
-        });
+        };
+
+        const ZONE_PATTERNS = [
+            /R[1-9][A-Z]?/g,  // R1, R2, R3A, etc.
+            /B[1-9][A-Z]?/g,  // B1, B2, B3A, etc.
+            /IN[1-9][A-Z]?/g, // IN1, IN2, etc.
+            /E[1-9][A-Z]?/g,  // E1, E2, etc.
+            /RE[1-9][A-Z]?/g, // RE1, RE2, etc.
+            /RU[1-9][A-Z]?/g  // RU1, RU2, etc.
+        ];
 
         // File input handling
         const fileInput = document.getElementById('fileInput');
@@ -502,12 +682,27 @@
         uploadSection.addEventListener('drop', handleDrop);
         uploadSection.addEventListener('dragleave', handleDragLeave);
 
+        // Update config when inputs change
+        document.getElementById('yTolerance').addEventListener('change', updateConfig);
+        document.getElementById('columnGap').addEventListener('change', updateConfig);
+        document.getElementById('ocrThreshold').addEventListener('change', updateConfig);
+        document.getElementById('minConfidence').addEventListener('change', updateConfig);
+
+        function updateConfig() {
+            parserConfig = {
+                yTolerance: parseInt(document.getElementById('yTolerance').value),
+                columnGap: parseInt(document.getElementById('columnGap').value),
+                ocrThreshold: parseInt(document.getElementById('ocrThreshold').value),
+                minConfidence: parseFloat(document.getElementById('minConfidence').value)
+            };
+            logMessage('Parser configuration updated', 'info');
+        }
+
         function handleFileSelect(event) {
             const files = Array.from(event.target.files);
             logMessage(`Files selected: ${files.length}`, 'info');
             
             if (files.length > 0) {
-                // Validate files
                 const validFiles = files.filter(f => f.type === 'application/pdf');
                 if (validFiles.length === 0) {
                     showFileStatus('Please select PDF files only', 'error');
@@ -565,292 +760,81 @@
             document.getElementById('progressPercent').textContent = percentage + '%';
         }
 
-        async function processFiles(files) {
-            processingCancelled = false;
-            logMessage(`Starting iterative processing of ${files.length} file(s)`, 'info');
+        // Text normalization functions
+        function normalizeText(text) {
+            if (!text) return '';
             
-            document.getElementById('processingSection').style.display = 'block';
+            // Collapse spaced capitals: "L A N D S C A P E D" → "LANDSCAPED"
+            text = text.replace(/([A-Z])\s+(?=[A-Z])/g, '$1');
             
-            let totalPages = 0;
-            let allPageData = [];
-            let allSections = [];
-            let allDevelopmentRules = [];
-            let allZoningAreas = [];
+            // Join hyphenated line breaks
+            text = text.replace(/(\w+)-\s*\n\s*(\w+)/g, '$1$2');
+            
+            // Remove stray spaces in numerals and percentages
+            text = text.replace(/(\d+)\s+(\.\s*\d+)/g, '$1$2');
+            text = text.replace(/(\d+(?:\.\d+)?)\s*%/g, '$1%');
+            text = text.replace(/(\d+(?:\.\d+)?)\s*(m²?|metres?|meters?|storeys?|floors?)/gi, '$1$2');
+            
+            // Standardize comparison operators
+            text = text.replace(/≥|>=|at\s+least|minimum|min/gi, '≥');
+            text = text.replace(/≤|<=|maximum|max|not\s+exceed|no\s+more\s+than/gi, '≤');
+            
+            // Standardize newlines
+            text = text.replace(/\r\n|\r/g, '\n');
+            
+            return text.trim();
+        }
 
-            try {
-                // First pass: Count total pages across all files
-                logMessage('Counting total pages...', 'info');
-                for (const file of files) {
-                    const pageCount = await getPageCount(file);
-                    totalPages += pageCount;
-                    logMessage(`${file.name}: ${pageCount} pages`, 'info');
-                }
-
-                let currentPageIndex = 0;
-
-                // Second pass: Process each file page by page
-                for (let fileIndex = 0; fileIndex < files.length; fileIndex++) {
-                    if (processingCancelled) break;
-                    
-                    const file = files[fileIndex];
-                    logMessage(`Processing file: ${file.name}`, 'info');
-                    
-                    try {
-                        const result = await processFileIteratively(file, currentPageIndex, totalPages);
-                        
-                        allPageData.push(...result.pages);
-                        allSections.push(...result.sections);
-                        allDevelopmentRules.push(...result.rules);
-                        allZoningAreas.push(...result.zones);
-                        
-                        currentPageIndex += result.pages.length;
-                        
-                        logMessage(`Completed ${file.name}: ${result.pages.length} pages processed`, 'success');
-                        
-                    } catch (error) {
-                        logMessage(`Error processing ${file.name}: ${error.message}`, 'error');
-                        // Continue with next file
+        function reconstructLinesFromCoordinates(textItems) {
+            if (!textItems || textItems.length === 0) return [];
+            
+            // Group items by y-position within tolerance
+            const lineGroups = [];
+            const sortedItems = [...textItems].sort((a, b) => b.transform[5] - a.transform[5]); // Sort by y (top to bottom)
+            
+            for (const item of sortedItems) {
+                const y = item.transform[5];
+                let foundGroup = false;
+                
+                for (const group of lineGroups) {
+                    if (Math.abs(group.y - y) <= parserConfig.yTolerance) {
+                        group.items.push(item);
+                        foundGroup = true;
+                        break;
                     }
                 }
-
-                if (!processingCancelled) {
-                    logMessage('Analyzing extracted content...', 'info');
-                    updateProgress(currentPageIndex + 1, totalPages + 5, 'Analyzing content...');
-                    await sleep(300);
-
-                    logMessage('Generating structured outputs...', 'info');
-                    updateProgress(currentPageIndex + 3, totalPages + 5, 'Generating outputs...');
-                    
-                    // Generate embeddings
-                    const apiKey = document.getElementById('apiKey').value.trim();
-                    let embeddingsData;
-                    
-                    if (apiKey && allSections.length > 0) {
-                        try {
-                            logMessage('Generating real vector embeddings...', 'info');
-                            embeddingsData = await generateRealEmbeddings(allSections, apiKey);
-                            logMessage('Vector embeddings generated successfully', 'success');
-                        } catch (error) {
-                            logMessage(`Embedding generation failed: ${error.message}`, 'warning');
-                            embeddingsData = generateSimulatedEmbeddings(allSections);
-                        }
-                    } else {
-                        logMessage('Generating simulated embeddings...', 'info');
-                        embeddingsData = generateSimulatedEmbeddings(allSections);
-                    }
-
-                    // Generate all outputs
-                    processedData = generateStructuredOutputs({
-                        files: files.map(f => f.name),
-                        totalPages: allPageData.length,
-                        pages: allPageData,
-                        sections: allSections,
-                        developmentRules: allDevelopmentRules,
-                        zoningAreas: allZoningAreas,
-                        embeddings: embeddingsData
+                
+                if (!foundGroup) {
+                    lineGroups.push({
+                        y: y,
+                        items: [item]
                     });
-
-                    updateProgress(totalPages + 5, totalPages + 5, 'Complete!');
-                    logMessage(`Processing complete! ${allPageData.length} pages processed`, 'success');
-                    
-                    // Update statistics
-                    document.getElementById('statPages').textContent = allPageData.length;
-                    document.getElementById('statSections').textContent = allSections.length;
-                    document.getElementById('statRules').textContent = allDevelopmentRules.length;
-                    document.getElementById('statZones').textContent = allZoningAreas.length;
-
-                    // Show results
-                    setTimeout(() => {
-                        document.getElementById('processingSection').style.display = 'none';
-                        document.getElementById('resultsSection').style.display = 'block';
-                        displayResults();
-                    }, 1000);
                 }
-
-            } catch (error) {
-                logMessage(`Processing failed: ${error.message}`, 'error');
-                showFileStatus(`Processing failed: ${error.message}`, 'error');
             }
-        }
-
-        async function getPageCount(file) {
-            return new Promise((resolve, reject) => {
-                const reader = new FileReader();
+            
+            // Sort items within each line by x-position (left to right)
+            const reconstructedLines = lineGroups.map(group => {
+                const sortedItems = group.items.sort((a, b) => a.transform[4] - b.transform[4]);
+                const lineText = sortedItems.map(item => item.str).join(' ');
                 
-                reader.onload = async function(e) {
-                    try {
-                        const typedarray = new Uint8Array(e.target.result);
-                        const pdf = await pdfjsLib.getDocument({ data: typedarray }).promise;
-                        resolve(pdf.numPages);
-                    } catch (error) {
-                        reject(new Error(`Failed to count pages: ${error.message}`));
-                    }
+                return {
+                    text: normalizeText(lineText),
+                    y: group.y,
+                    items: sortedItems,
+                    xPositions: sortedItems.map(item => item.transform[4])
                 };
-                
-                reader.onerror = () => reject(new Error('Failed to read file'));
-                reader.readAsArrayBuffer(file);
             });
+            
+            return reconstructedLines.filter(line => line.text.trim().length > 0);
         }
 
-        async function processFileIteratively(file, startingPageIndex, totalPages) {
-            return new Promise((resolve, reject) => {
-                const reader = new FileReader();
+        function detectTableStructure(lines) {
+            const tables = [];
+            let currentTable = null;
+            
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i];
+                const isHeaderRow = detectHeaderRow(line.text);
+                const columnCount = countColumns(line);
                 
-                reader.onload = async function(e) {
-                    try {
-                        const typedarray = new Uint8Array(e.target.result);
-                        const pdf = await pdfjsLib.getDocument({ data: typedarray }).promise;
-                        
-                        const pages = [];
-                        const sections = [];
-                        const rules = [];
-                        const zones = [];
-
-                        // Process each page individually
-                        for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-                            if (processingCancelled) break;
-                            
-                            updateProgress(
-                                startingPageIndex + pageNum, 
-                                totalPages, 
-                                `Processing ${file.name} - Page ${pageNum}/${pdf.numPages}`
-                            );
-
-                            try {
-                                const page = await pdf.getPage(pageNum);
-                                const textContent = await page.getTextContent();
-                                
-                                let pageText = '';
-                                textContent.items.forEach(item => {
-                                    pageText += item.str + ' ';
-                                });
-
-                                // Store page data
-                                const pageData = {
-                                    page_number: pageNum,
-                                    source_file: file.name,
-                                    content: pageText.trim(),
-                                    word_count: pageText.trim().split(/\s+/).length,
-                                    processed_at: new Date().toISOString()
-                                };
-                                pages.push(pageData);
-
-                                // Parse content for this page
-                                if (pageText.trim().length > 10) {
-                                    const parsed = parseDCPContent(pageText, file.name, pageNum);
-                                    sections.push(...parsed.sections);
-                                    rules.push(...parsed.rules);
-                                    zones.push(...parsed.zones);
-                                    
-                                    if (parsed.sections.length > 0 || parsed.rules.length > 0 || parsed.zones.length > 0) {
-                                        logMessage(
-                                            `Page ${pageNum}: Found ${parsed.sections.length} sections, ${parsed.rules.length} rules, ${parsed.zones.length} zones`, 
-                                            'success'
-                                        );
-                                    }
-                                }
-
-                                // Small delay to prevent UI freezing
-                                await sleep(50);
-
-                            } catch (pageError) {
-                                logMessage(`Error on page ${pageNum}: ${pageError.message}`, 'warning');
-                                
-                                // Add error page data
-                                pages.push({
-                                    page_number: pageNum,
-                                    source_file: file.name,
-                                    content: `[Error processing page: ${pageError.message}]`,
-                                    word_count: 0,
-                                    processed_at: new Date().toISOString(),
-                                    error: true
-                                });
-                            }
-                        }
-
-                        resolve({ pages, sections, rules, zones });
-                        
-                    } catch (error) {
-                        reject(new Error(`PDF processing failed: ${error.message}`));
-                    }
-                };
-                
-                reader.onerror = () => reject(new Error('Failed to read file'));
-                reader.readAsArrayBuffer(file);
-            });
-        }
-
-        function parseDCPContent(content, filename, pageNumber) {
-            const sections = [];
-            const rules = [];
-            const zones = [];
-
-            if (!content || content.trim().length < 10) {
-                return { sections: [], rules: [], zones: [] };
-            }
-
-            // Enhanced section detection
-            const sectionPatterns = [
-                /\d+\.[\d\s]*[A-Z][^\n\r]{5,100}/g,  // Numbered sections
-                /[A-Z][A-Z\s]{10,50}(?=\n|\r|$)/g,   // All caps headings
-                /(?:Part|Section|Chapter)\s+[IVX\d]+[^\n\r]{0,50}/gi, // Part/Section/Chapter
-                /\d+\.\d+[\s\w\-]{5,80}/g            // Sub-numbered sections
-            ];
-
-            sectionPatterns.forEach(pattern => {
-                const matches = content.match(pattern);
-                if (matches) {
-                    matches.forEach(match => {
-                        sections.push({
-                            title: match.trim(),
-                            content: match.trim(),
-                            source: filename,
-                            page: pageNumber,
-                            type: 'section'
-                        });
-                    });
-                }
-            });
-
-            // Enhanced development rules extraction
-            const rulePatterns = [
-                {
-                    type: "Building Height",
-                    pattern: /(?:maximum|max)?\s*(?:building\s*)?height[:\s]*(\d+(?:\.\d+)?\s*(?:m|metres?|storeys?|floors?))/gi
-                },
-                {
-                    type: "Floor Space Ratio",
-                    pattern: /(?:FSR|floor\s*space\s*ratio)[:\s]*(\d+(?:\.\d+)?)/gi
-                },
-                {
-                    type: "Setback",
-                    pattern: /(?:front|rear|side)\s*setback[:\s]*(\d+(?:\.\d+)?\s*m)/gi
-                },
-                {
-                    type: "Lot Coverage",
-                    pattern: /(?:maximum\s*)?(?:site\s*coverage|lot\s*coverage)[:\s]*(\d+(?:\.\d+)?%?)/gi
-                },
-                {
-                    type: "Car Parking",
-                    pattern: /(?:car\s*parking|vehicle\s*parking)[:\s]*(\d+(?:\.\d+)?\s*(?:space|per|\/)?)/gi
-                }
-            ];
-
-            rulePatterns.forEach(({ type, pattern }) => {
-                const matches = content.match(pattern);
-                if (matches) {
-                    matches.forEach(match => {
-                        rules.push({
-                            type: type,
-                            value: match.trim(),
-                            source: filename,
-                            page: pageNumber
-                        });
-                    });
-                }
-            });
-
-            // Enhanced zoning extraction
-            const zonePatterns = [
-                /([A-Z]+\d+[A-Z]*)\s*[-–]\s*([^.\n\r]{10,80})/g,  // Code - Description
-                /Zone\s+([A-
+                if (isHeaderRow && columnCount > 1) {

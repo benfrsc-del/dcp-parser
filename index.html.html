@@ -1283,45 +1283,62 @@
                                 const page = await pdf.getPage(pageNum);
                                 let textContent = await page.getTextContent();
                                 let pageText = '';
-                                let useOCR = false;
+                                let useAdvancedParsing = true;
+
+                                logMessage(`Page ${pageNum}: Found ${textContent.items.length} text items`, 'info');
+
+                                // Check if we have coordinate data
+                                if (textContent.items.length > 0 && textContent.items[0].transform) {
+                                    // Use advanced coordinate-based parsing
+                                    const lines = reconstructLinesFromCoordinates(textContent.items);
+                                    pageText = lines.map(line => line.text).join('\n');
+                                    
+                                    logMessage(`Page ${pageNum}: Reconstructed ${lines.length} lines`, 'success');
+                                    
+                                    // Detect tables in coordinate-reconstructed text
+                                    const pageTables = detectTableStructure(lines);
+                                    if (pageTables.length > 0) {
+                                        logMessage(`Page ${pageNum}: Found ${pageTables.length} tables`, 'success');
+                                        tables.push(...pageTables.map(table => ({
+                                            ...table,
+                                            page: pageNum,
+                                            source: file.name
+                                        })));
+                                        
+                                        // Extract rules from tables
+                                        for (const table of pageTables) {
+                                            for (const row of table.rows) {
+                                                for (const rule of row.rules) {
+                                                    rules.push({
+                                                        ...rule,
+                                                        page: pageNum,
+                                                        source: file.name,
+                                                        section_number: currentSection.number,
+                                                        section_title: currentSection.title
+                                                    });
+                                                }
+                                            }
+                                        }
+                                    }
+                                } else {
+                                    // Fallback to basic text extraction
+                                    useAdvancedParsing = false;
+                                    logMessage(`Page ${pageNum}: No coordinate data, using basic extraction`, 'warning');
+                                    pageText = textContent.items.map(item => item.str).join(' ');
+                                }
+
+                                // Apply text normalization regardless of extraction method
+                                pageText = normalizeText(pageText);
+                                
+                                logMessage(`Page ${pageNum}: Text length after normalization: ${pageText.length}`, 'info');
 
                                 // Check if OCR is needed
                                 if (await needsOCR(page)) {
                                     const ocrResult = await performOCR(page);
                                     if (ocrResult.confidence > parserConfig.ocrThreshold) {
                                         pageText = ocrResult.text;
-                                        useOCR = true;
                                         ocrPages++;
-                                        logMessage(`OCR used on page ${pageNum}`, 'info');
-                                    }
-                                }
-
-                                // Use regular text extraction if OCR not used
-                                if (!useOCR) {
-                                    const lines = reconstructLinesFromCoordinates(textContent.items);
-                                    pageText = lines.map(line => line.text).join('\n');
-                                    
-                                    // Detect tables in coordinate-reconstructed text
-                                    const pageTables = detectTableStructure(lines);
-                                    tables.push(...pageTables.map(table => ({
-                                        ...table,
-                                        page: pageNum,
-                                        source: file.name
-                                    })));
-                                    
-                                    // Extract rules from tables
-                                    for (const table of pageTables) {
-                                        for (const row of table.rows) {
-                                            for (const rule of row.rules) {
-                                                rules.push({
-                                                    ...rule,
-                                                    page: pageNum,
-                                                    source: file.name,
-                                                    section_number: currentSection.number,
-                                                    section_title: currentSection.title
-                                                });
-                                            }
-                                        }
+                                        logMessage(`Page ${pageNum}: OCR used (confidence: ${ocrResult.confidence})`, 'info');
                                     }
                                 }
 
@@ -1339,19 +1356,26 @@
                                         page: pageNum,
                                         source: file.name
                                     });
+                                    
+                                    logMessage(`Page ${pageNum}: Found section ${currentSection.number}`, 'success');
                                 }
 
-                                // Extract rules from prose text as fallback
+                                // Extract rules from prose text as fallback or supplement
                                 const proseRules = extractRulesFromProse(pageText, file.name, pageNum, currentSection);
-                                rules.push(...proseRules);
+                                if (proseRules.length > 0) {
+                                    logMessage(`Page ${pageNum}: Extracted ${proseRules.length} rules from prose`, 'success');
+                                    rules.push(...proseRules);
+                                }
 
                                 await sleep(50); // Prevent UI freezing
 
                             } catch (pageError) {
-                                logMessage(`Error on page ${pageNum}: ${pageError.message}`, 'warning');
+                                logMessage(`Error on page ${pageNum}: ${pageError.message}`, 'error');
                             }
                         }
 
+                        logMessage(`File processing complete: ${rules.length} total rules extracted`, 'success');
+                        
                         resolve({ 
                             rules, 
                             tables, 

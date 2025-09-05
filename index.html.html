@@ -838,3 +838,1008 @@
                 const columnCount = countColumns(line);
                 
                 if (isHeaderRow && columnCount > 1) {
+                    // Start new table
+                    if (currentTable) {
+                        tables.push(currentTable);
+                    }
+                    
+                    currentTable = {
+                        startLine: i,
+                        headerRow: line,
+                        columns: parseColumnStructure(line),
+                        rows: [],
+                        zones: extractZonesFromHeader(line.text)
+                    };
+                    
+                    logMessage(`Table detected: ${line.text.substring(0, 50)}...`, 'info');
+                } else if (currentTable && isDataRow(line, currentTable)) {
+                    // Add data row to current table
+                    const parsedRow = parseTableRow(line, currentTable);
+                    if (parsedRow) {
+                        currentTable.rows.push(parsedRow);
+                    }
+                } else if (currentTable && (columnCount < 2 || isEndOfTable(line))) {
+                    // End current table
+                    tables.push(currentTable);
+                    currentTable = null;
+                }
+            }
+            
+            if (currentTable) {
+                tables.push(currentTable);
+            }
+            
+            return tables;
+        }
+
+        function detectHeaderRow(text) {
+            const headerIndicators = [
+                /zone|development\s*standard|control|requirement/i,
+                /R[1-9]|B[1-9]|E[1-9]|IN[1-9]/,
+                /minimum|maximum|landscap/i,
+                /setback|height|coverage|FSR/i
+            ];
+            
+            return headerIndicators.some(pattern => pattern.test(text));
+        }
+
+        function countColumns(line) {
+            // Count potential columns based on significant gaps in x-positions
+            if (!line.xPositions || line.xPositions.length < 2) return 1;
+            
+            let columns = 1;
+            for (let i = 1; i < line.xPositions.length; i++) {
+                const gap = line.xPositions[i] - line.xPositions[i-1];
+                if (gap > parserConfig.columnGap) {
+                    columns++;
+                }
+            }
+            
+            return columns;
+        }
+
+        function parseColumnStructure(line) {
+            const columns = [];
+            const words = line.text.split(/\s+/);
+            let currentX = 0;
+            
+            for (let i = 0; i < line.items.length; i++) {
+                const item = line.items[i];
+                const x = item.transform[4];
+                
+                if (i === 0 || x - currentX > parserConfig.columnGap) {
+                    columns.push({
+                        x: x,
+                        text: item.str,
+                        width: item.width || 50
+                    });
+                    currentX = x;
+                } else {
+                    // Append to last column
+                    if (columns.length > 0) {
+                        columns[columns.length - 1].text += ' ' + item.str;
+                    }
+                }
+            }
+            
+            return columns;
+        }
+
+        function extractZonesFromHeader(headerText) {
+            const zones = [];
+            
+            for (const pattern of ZONE_PATTERNS) {
+                const matches = headerText.match(pattern);
+                if (matches) {
+                    zones.push(...matches);
+                }
+            }
+            
+            return [...new Set(zones)]; // Remove duplicates
+        }
+
+        function isDataRow(line, table) {
+            // Check if line contains numeric data or planning control keywords
+            const hasNumeric = /\d+(?:\.\d+)?(?:%|m²?|storeys?)/i.test(line.text);
+            const hasControl = Object.values(PLANNING_CONTROLS).some(control => 
+                control.patterns.some(pattern => pattern.test(line.text))
+            );
+            
+            return hasNumeric || hasControl;
+        }
+
+        function parseTableRow(line, table) {
+            const cells = splitRowIntoCells(line, table.columns);
+            const row = {
+                line: line.text,
+                cells: cells,
+                rules: []
+            };
+            
+            // Extract rules from this row
+            const controlType = identifyControlType(cells[0]?.text || '');
+            
+            if (controlType) {
+                // Parse each cell for zone-specific values
+                for (let i = 1; i < cells.length && i - 1 < table.zones.length; i++) {
+                    const cellText = cells[i]?.text || '';
+                    const zone = table.zones[i - 1];
+                    const rule = parseControlValue(cellText, controlType, zone);
+                    
+                    if (rule) {
+                        row.rules.push(rule);
+                    }
+                }
+            }
+            
+            return row;
+        }
+
+        function splitRowIntoCells(line, columns) {
+            const cells = [];
+            
+            for (let i = 0; i < columns.length; i++) {
+                const column = columns[i];
+                const nextColumn = columns[i + 1];
+                
+                const cellItems = line.items.filter(item => {
+                    const x = item.transform[4];
+                    const withinStart = x >= column.x - 10;
+                    const withinEnd = !nextColumn || x < nextColumn.x - 10;
+                    return withinStart && withinEnd;
+                });
+                
+                const cellText = cellItems.map(item => item.str).join(' ').trim();
+                cells.push({
+                    text: normalizeText(cellText),
+                    x: column.x,
+                    items: cellItems
+                });
+            }
+            
+            return cells;
+        }
+
+        function identifyControlType(text) {
+            for (const [type, config] of Object.entries(PLANNING_CONTROLS)) {
+                if (config.patterns.some(pattern => pattern.test(text))) {
+                    return type;
+                }
+            }
+            return null;
+        }
+
+        function parseControlValue(cellText, controlType, zone) {
+            if (!cellText || cellText.trim() === '' || cellText === '-') {
+                return null;
+            }
+            
+            const config = PLANNING_CONTROLS[controlType];
+            if (!config) return null;
+            
+            // Extract numeric value and unit
+            const numericMatch = cellText.match(/(\d+(?:\.\d+)?)\s*([%m²\w]*)/i);
+            if (!numericMatch) return null;
+            
+            const value = parseFloat(numericMatch[1]);
+            const unit = numericMatch[2] || '';
+            
+            // Determine comparator
+            let comparator = '=';
+            for (const comp of config.comparators) {
+                if (cellText.includes(comp) || (config.comparators.includes('≥') && controlType.includes('minimum'))) {
+                    comparator = comp === 'minimum' || comp === 'min' || comp === 'at least' ? '≥' : 
+                                comp === 'maximum' || comp === 'max' || comp === 'not exceed' ? '≤' : comp;
+                    break;
+                }
+            }
+            
+            // Calculate confidence score
+            const confidence = calculateConfidence(cellText, controlType, zone, value, unit);
+            
+            return {
+                type: controlType.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()),
+                zone: zone,
+                value: value,
+                unit: unit,
+                comparator: comparator,
+                source_line: cellText,
+                confidence: confidence
+            };
+        }
+
+        function calculateConfidence(cellText, controlType, zone, value, unit) {
+            let confidence = 0.5; // Base confidence
+            
+            // Increase confidence for clear numeric matches
+            if (/^\d+(?:\.\d+)?[%m²\w]*$/.test(cellText.trim())) {
+                confidence += 0.3;
+            }
+            
+            // Increase confidence for appropriate units
+            const config = PLANNING_CONTROLS[controlType];
+            if (config && config.units.some(u => unit.toLowerCase().includes(u.toLowerCase()))) {
+                confidence += 0.2;
+            }
+            
+            // Increase confidence for valid zone
+            if (ZONE_PATTERNS.some(pattern => pattern.test(zone))) {
+                confidence += 0.1;
+            }
+            
+            // Decrease confidence for suspicious values
+            if ((controlType === 'site_coverage' || controlType === 'landscaped_area') && value > 100) {
+                confidence -= 0.3;
+            }
+            
+            if (controlType === 'fsr' && value > 10) {
+                confidence -= 0.2;
+            }
+            
+            return Math.min(1.0, Math.max(0.0, confidence));
+        }
+
+        function isEndOfTable(line) {
+            const endIndicators = [
+                /^(note|notes?):/i,
+                /^[a-z]/,  // Lines starting with lowercase (likely prose)
+                /^\d+\.\d+/,  // Section numbers
+                /development\s*application/i
+            ];
+            
+            return endIndicators.some(pattern => pattern.test(line.text));
+        }
+
+        // OCR Functions
+        async function needsOCR(page) {
+            const textContent = await page.getTextContent();
+            const textLength = textContent.items.reduce((sum, item) => sum + item.str.length, 0);
+            
+            // If very little text extracted, likely needs OCR
+            return textLength < 100;
+        }
+
+        async function performOCR(page) {
+            try {
+                logMessage('Performing OCR on low-text page...', 'info');
+                
+                const viewport = page.getViewport({ scale: 2.0 });
+                const canvas = document.createElement('canvas');
+                const context = canvas.getContext('2d');
+                canvas.height = viewport.height;
+                canvas.width = viewport.width;
+                
+                const renderContext = {
+                    canvasContext: context,
+                    viewport: viewport
+                };
+                
+                await page.render(renderContext).promise;
+                
+                const imageData = canvas.toDataURL('image/png');
+                
+                if (typeof Tesseract !== 'undefined') {
+                    const result = await Tesseract.recognize(imageData, 'eng', {
+                        logger: m => {
+                            if (m.status === 'recognizing text') {
+                                logMessage(`OCR Progress: ${Math.round(m.progress * 100)}%`, 'info');
+                            }
+                        }
+                    });
+                    
+                    return {
+                        text: result.data.text,
+                        confidence: result.data.confidence
+                    };
+                } else {
+                    logMessage('Tesseract.js not available for OCR', 'warning');
+                    return { text: '', confidence: 0 };
+                }
+                
+            } catch (error) {
+                logMessage(`OCR failed: ${error.message}`, 'error');
+                return { text: '', confidence: 0 };
+            }
+        }
+
+        // Main processing function
+        async function processFiles(files) {
+            processingCancelled = false;
+            updateConfig(); // Ensure latest config is used
+            
+            logMessage(`Starting advanced processing of ${files.length} file(s)`, 'info');
+            
+            document.getElementById('processingSection').style.display = 'block';
+            
+            let totalPages = 0;
+            let allRules = [];
+            let allTables = [];
+            let allSections = [];
+            let totalOCRPages = 0;
+            let lowConfidenceItems = [];
+
+            try {
+                // Count total pages
+                for (const file of files) {
+                    const pageCount = await getPageCount(file);
+                    totalPages += pageCount;
+                }
+
+                let currentPageIndex = 0;
+
+                // Process each file
+                for (let fileIndex = 0; fileIndex < files.length; fileIndex++) {
+                    if (processingCancelled) break;
+                    
+                    const file = files[fileIndex];
+                    logMessage(`Processing file: ${file.name}`, 'info');
+                    
+                    try {
+                        const result = await processFileAdvanced(file, currentPageIndex, totalPages);
+                        
+                        allRules.push(...result.rules);
+                        allTables.push(...result.tables);
+                        allSections.push(...result.sections);
+                        totalOCRPages += result.ocrPages;
+                        
+                        // Filter low confidence items
+                        const lowConfidence = result.rules.filter(rule => 
+                            rule.confidence < parserConfig.minConfidence
+                        );
+                        lowConfidenceItems.push(...lowConfidence);
+                        
+                        currentPageIndex += result.pageCount;
+                        
+                        logMessage(`Completed ${file.name}: ${result.rules.length} rules extracted`, 'success');
+                        
+                    } catch (error) {
+                        logMessage(`Error processing ${file.name}: ${error.message}`, 'error');
+                    }
+                }
+
+                if (!processingCancelled) {
+                    // Remove duplicates and reconcile conflicts
+                    const cleanedRules = deduplicateAndReconcile(allRules);
+                    
+                    logMessage('Generating embeddings...', 'info');
+                    updateProgress(currentPageIndex + 2, totalPages + 5, 'Generating embeddings...');
+                    
+                    const apiKey = document.getElementById('apiKey').value.trim();
+                    let embeddingsData;
+                    
+                    if (apiKey && cleanedRules.length > 0) {
+                        try {
+                            embeddingsData = await generateRuleEmbeddings(cleanedRules, apiKey);
+                            logMessage('Vector embeddings generated successfully', 'success');
+                        } catch (error) {
+                            logMessage(`Embedding generation failed: ${error.message}`, 'warning');
+                            embeddingsData = generateSimulatedEmbeddings(cleanedRules);
+                        }
+                    } else {
+                        embeddingsData = generateSimulatedEmbeddings(cleanedRules);
+                    }
+
+                    processedData = generateStructuredOutputs({
+                        files: files.map(f => f.name),
+                        totalPages: currentPageIndex,
+                        rules: cleanedRules,
+                        tables: allTables,
+                        sections: allSections,
+                        embeddings: embeddingsData,
+                        ocrPages: totalOCRPages,
+                        lowConfidenceItems: lowConfidenceItems
+                    });
+
+                    updateProgress(totalPages + 5, totalPages + 5, 'Complete!');
+                    logMessage(`Processing complete! ${cleanedRules.length} rules extracted`, 'success');
+                    
+                    // Update statistics
+                    const avgConfidence = cleanedRules.length > 0 ? 
+                        Math.round((cleanedRules.reduce((sum, rule) => sum + rule.confidence, 0) / cleanedRules.length) * 100) : 0;
+                    
+                    document.getElementById('statPages').textContent = currentPageIndex;
+                    document.getElementById('statRules').textContent = cleanedRules.length;
+                    document.getElementById('statTables').textContent = allTables.length;
+                    document.getElementById('statZones').textContent = [...new Set(cleanedRules.map(r => r.zone))].length;
+                    document.getElementById('statConfidence').textContent = avgConfidence + '%';
+                    document.getElementById('statOCRPages').textContent = totalOCRPages;
+
+                    // Show low confidence items if any
+                    if (lowConfidenceItems.length > 0) {
+                        displayLowConfidenceItems(lowConfidenceItems);
+                    }
+
+                    setTimeout(() => {
+                        document.getElementById('processingSection').style.display = 'none';
+                        document.getElementById('resultsSection').style.display = 'block';
+                        displayResults();
+                    }, 1000);
+                }
+
+            } catch (error) {
+                logMessage(`Processing failed: ${error.message}`, 'error');
+                showFileStatus(`Processing failed: ${error.message}`, 'error');
+            }
+        }
+
+        async function getPageCount(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                
+                reader.onload = async function(e) {
+                    try {
+                        const typedarray = new Uint8Array(e.target.result);
+                        const pdf = await pdfjsLib.getDocument({ data: typedarray }).promise;
+                        resolve(pdf.numPages);
+                    } catch (error) {
+                        reject(new Error(`Failed to count pages: ${error.message}`));
+                    }
+                };
+                
+                reader.onerror = () => reject(new Error('Failed to read file'));
+                reader.readAsArrayBuffer(file);
+            });
+        }
+
+        async function processFileAdvanced(file, startingPageIndex, totalPages) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                
+                reader.onload = async function(e) {
+                    try {
+                        const typedarray = new Uint8Array(e.target.result);
+                        const pdf = await pdfjsLib.getDocument({ data: typedarray }).promise;
+                        
+                        const rules = [];
+                        const tables = [];
+                        const sections = [];
+                        let ocrPages = 0;
+                        let currentSection = { number: '', title: '' };
+
+                        for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+                            if (processingCancelled) break;
+                            
+                            updateProgress(
+                                startingPageIndex + pageNum, 
+                                totalPages, 
+                                `${file.name} - Page ${pageNum}/${pdf.numPages}`
+                            );
+
+                            try {
+                                const page = await pdf.getPage(pageNum);
+                                let textContent = await page.getTextContent();
+                                let pageText = '';
+                                let useOCR = false;
+
+                                // Check if OCR is needed
+                                if (await needsOCR(page)) {
+                                    const ocrResult = await performOCR(page);
+                                    if (ocrResult.confidence > parserConfig.ocrThreshold) {
+                                        pageText = ocrResult.text;
+                                        useOCR = true;
+                                        ocrPages++;
+                                        logMessage(`OCR used on page ${pageNum}`, 'info');
+                                    }
+                                }
+
+                                // Use regular text extraction if OCR not used
+                                if (!useOCR) {
+                                    const lines = reconstructLinesFromCoordinates(textContent.items);
+                                    pageText = lines.map(line => line.text).join('\n');
+                                    
+                                    // Detect tables in coordinate-reconstructed text
+                                    const pageTables = detectTableStructure(lines);
+                                    tables.push(...pageTables.map(table => ({
+                                        ...table,
+                                        page: pageNum,
+                                        source: file.name
+                                    })));
+                                    
+                                    // Extract rules from tables
+                                    for (const table of pageTables) {
+                                        for (const row of table.rows) {
+                                            for (const rule of row.rules) {
+                                                rules.push({
+                                                    ...rule,
+                                                    page: pageNum,
+                                                    source: file.name,
+                                                    section_number: currentSection.number,
+                                                    section_title: currentSection.title
+                                                });
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // Track sections across pages
+                                const sectionMatch = pageText.match(/^(\d+(?:\.\d+)*)\s+(.+?)$/m);
+                                if (sectionMatch) {
+                                    currentSection = {
+                                        number: sectionMatch[1],
+                                        title: sectionMatch[2].trim()
+                                    };
+                                    
+                                    sections.push({
+                                        number: currentSection.number,
+                                        title: currentSection.title,
+                                        page: pageNum,
+                                        source: file.name
+                                    });
+                                }
+
+                                // Extract rules from prose text as fallback
+                                const proseRules = extractRulesFromProse(pageText, file.name, pageNum, currentSection);
+                                rules.push(...proseRules);
+
+                                await sleep(50); // Prevent UI freezing
+
+                            } catch (pageError) {
+                                logMessage(`Error on page ${pageNum}: ${pageError.message}`, 'warning');
+                            }
+                        }
+
+                        resolve({ 
+                            rules, 
+                            tables, 
+                            sections, 
+                            pageCount: pdf.numPages, 
+                            ocrPages 
+                        });
+                        
+                    } catch (error) {
+                        reject(new Error(`PDF processing failed: ${error.message}`));
+                    }
+                };
+                
+                reader.onerror = () => reject(new Error('Failed to read file'));
+                reader.readAsArrayBuffer(file);
+            });
+        }
+
+        function extractRulesFromProse(text, filename, pageNumber, currentSection) {
+            const rules = [];
+            const normalizedText = normalizeText(text);
+            
+            // Look for inline development controls
+            const patterns = [
+                /(\w+(?:\s+\w+)*)\s*[:\-]\s*(\d+(?:\.\d+)?)\s*([%m²\w]*)/gi,
+                /(minimum|maximum)\s+(\w+(?:\s+\w+)*)\s+(?:of|is)\s*(\d+(?:\.\d+)?)\s*([%m²\w]*)/gi,
+                /(\w+(?:\s+\w+)*)\s+(?:shall|must)\s+(?:be|not\s+exceed)\s*(\d+(?:\.\d+)?)\s*([%m²\w]*)/gi
+            ];
+            
+            for (const pattern of patterns) {
+                let match;
+                while ((match = pattern.exec(normalizedText)) !== null) {
+                    const controlName = match[1] || match[2];
+                    const value = parseFloat(match[2] || match[3]);
+                    const unit = match[3] || match[4] || '';
+                    
+                    const controlType = identifyControlType(controlName);
+                    if (controlType && !isNaN(value)) {
+                        const confidence = calculateConfidence(match[0], controlType, '', value, unit);
+                        
+                        if (confidence >= parserConfig.minConfidence) {
+                            rules.push({
+                                type: controlType.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()),
+                                zone: '',
+                                value: value,
+                                unit: unit,
+                                comparator: match[0].includes('minimum') ? '≥' : 
+                                           match[0].includes('maximum') || match[0].includes('not exceed') ? '≤' : '=',
+                                source_line: match[0],
+                                page: pageNumber,
+                                source: filename,
+                                section_number: currentSection.number,
+                                section_title: currentSection.title,
+                                confidence: confidence
+                            });
+                        }
+                    }
+                }
+            }
+            
+            return rules;
+        }
+
+        function deduplicateAndReconcile(rules) {
+            const ruleMap = new Map();
+            const conflicts = [];
+            
+            for (const rule of rules) {
+                const key = `${rule.type}_${rule.zone}_${rule.source}`;
+                
+                if (ruleMap.has(key)) {
+                    const existing = ruleMap.get(key);
+                    if (existing.value !== rule.value) {
+                        // Conflict detected
+                        conflicts.push({
+                            type: rule.type,
+                            zone: rule.zone,
+                            values: [existing.value, rule.value],
+                            sources: [existing.source_line, rule.source_line],
+                            confidence: 'conflict'
+                        });
+                        
+                        // Keep the one with higher confidence
+                        if (rule.confidence > existing.confidence) {
+                            ruleMap.set(key, { ...rule, conflict: true });
+                        } else {
+                            existing.conflict = true;
+                        }
+                    }
+                } else {
+                    ruleMap.set(key, rule);
+                }
+            }
+            
+            if (conflicts.length > 0) {
+                logMessage(`Found ${conflicts.length} rule conflicts`, 'warning');
+            }
+            
+            return Array.from(ruleMap.values());
+        }
+
+        async function generateRuleEmbeddings(rules, apiKey) {
+            const embeddings = [];
+            
+            // Create semantic chunks from rules
+            const ruleChunks = rules.slice(0, 10).map(rule => {
+                return `${rule.type} (${rule.zone || 'General'}): ${rule.comparator} ${rule.value}${rule.unit} - Section ${rule.section_number || 'N/A'} ${rule.section_title || ''}`;
+            });
+            
+            for (let i = 0; i < ruleChunks.length; i++) {
+                try {
+                    const response = await fetch('https://api.openai.com/v1/embeddings', {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${apiKey}`,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            model: "text-embedding-3-small",
+                            input: ruleChunks[i],
+                            encoding_format: "float"
+                        })
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error(`API Error: ${response.statusText}`);
+                    }
+                    
+                    const data = await response.json();
+                    
+                    embeddings.push({
+                        chunk_id: `rule_${i}`,
+                        text: ruleChunks[i],
+                        vector: data.data[0].embedding,
+                        metadata: {
+                            rule_type: rules[i].type,
+                            zone: rules[i].zone,
+                            page: rules[i].page,
+                            section: rules[i].section_number,
+                            confidence: rules[i].confidence
+                        }
+                    });
+                    
+                    await sleep(200);
+                    
+                } catch (error) {
+                    console.error('Embedding generation failed:', error);
+                    throw error;
+                }
+            }
+            
+            return {
+                embedding_model: "text-embedding-3-small",
+                vector_dimensions: 1536,
+                total_chunks: embeddings.length,
+                embeddings: embeddings
+            };
+        }
+
+        function generateSimulatedEmbeddings(rules) {
+            return {
+                embedding_model: "simulated",
+                vector_dimensions: 1536,
+                total_chunks: Math.min(rules.length, 10),
+                embeddings: rules.slice(0, 10).map((rule, index) => ({
+                    chunk_id: `rule_${index}`,
+                    text: `${rule.type} (${rule.zone || 'General'}): ${rule.comparator} ${rule.value}${rule.unit}`,
+                    vector: Array.from({length: 1536}, () => Math.random().toFixed(6)),
+                    metadata: {
+                        rule_type: rule.type,
+                        zone: rule.zone,
+                        page: rule.page,
+                        section: rule.section_number,
+                        confidence: rule.confidence
+                    }
+                }))
+            };
+        }
+
+        function generateStructuredOutputs(data) {
+            const timestamp = new Date().toISOString();
+            
+            const jsonOutput = {
+                metadata: {
+                    generated: timestamp,
+                    files_processed: data.files,
+                    total_pages: data.totalPages,
+                    parser_version: "2.0.0",
+                    parser_config: parserConfig,
+                    ocr_pages: data.ocrPages
+                },
+                development_rules: data.rules,
+                tables_detected: data.tables.length,
+                sections: data.sections,
+                embeddings: data.embeddings,
+                quality_assurance: {
+                    total_rules: data.rules.length,
+                    high_confidence_rules: data.rules.filter(r => r.confidence >= 0.8).length,
+                    low_confidence_rules: data.lowConfidenceItems.length,
+                    average_confidence: data.rules.length > 0 ? 
+                        data.rules.reduce((sum, rule) => sum + rule.confidence, 0) / data.rules.length : 0
+                }
+            };
+
+            const summaryOutput = `ADVANCED DCP ANALYSIS SUMMARY
+Generated: ${timestamp}
+
+FILES PROCESSED: ${data.files.join(', ')}
+Total Pages: ${data.totalPages}
+OCR Pages: ${data.ocrPages}
+Tables Detected: ${data.tables.length}
+Development Rules: ${data.rules.length}
+Sections: ${data.sections.length}
+
+RULE QUALITY:
+High Confidence (≥0.8): ${data.rules.filter(r => r.confidence >= 0.8).length}
+Medium Confidence (0.5-0.8): ${data.rules.filter(r => r.confidence >= 0.5 && r.confidence < 0.8).length}
+Low Confidence (<0.5): ${data.lowConfidenceItems.length}
+Average Confidence: ${(data.rules.reduce((sum, rule) => sum + rule.confidence, 0) / data.rules.length * 100).toFixed(1)}%
+
+ZONES DETECTED: ${[...new Set(data.rules.map(r => r.zone))].filter(z => z).join(', ')}
+
+CONTROL TYPES FOUND:
+${Object.entries(data.rules.reduce((acc, rule) => {
+    acc[rule.type] = (acc[rule.type] || 0) + 1;
+    return acc;
+}, {})).map(([type, count]) => `• ${type}: ${count} rules`).join('\n')}
+
+PARSER CONFIGURATION:
+Y-Tolerance: ${parserConfig.yTolerance}px
+Column Gap: ${parserConfig.columnGap}px
+OCR Threshold: ${parserConfig.ocrThreshold}%
+Min Confidence: ${parserConfig.minConfidence}`;
+
+            return {
+                json: jsonOutput,
+                rules: data.rules,
+                summary: summaryOutput,
+                embeddings: data.embeddings
+            };
+        }
+
+        function displayLowConfidenceItems(items) {
+            const qaSection = document.getElementById('qaSection');
+            const container = document.getElementById('lowConfidenceItems');
+            
+            container.innerHTML = '';
+            
+            items.forEach((item, index) => {
+                const div = document.createElement('div');
+                div.className = 'confidence-item';
+                div.innerHTML = `
+                    <div><strong>${item.type}</strong> ${item.zone ? `(${item.zone})` : ''}</div>
+                    <div>Value: ${item.value}${item.unit}</div>
+                    <div>Source: "${item.source_line}"</div>
+                    <div>Page: ${item.page} | <span class="confidence-score">Confidence: ${Math.round(item.confidence * 100)}%</span></div>
+                `;
+                container.appendChild(div);
+            });
+            
+            qaSection.style.display = 'block';
+        }
+
+        function displayResults() {
+            document.getElementById('rulesCode').textContent = JSON.stringify(processedData.rules, null, 2);
+            document.getElementById('jsonCode').textContent = JSON.stringify(processedData.json, null, 2);
+            document.getElementById('summaryCode').textContent = processedData.summary;
+            document.getElementById('embeddingsCode').textContent = JSON.stringify(processedData.embeddings, null, 2);
+        }
+
+        function showTab(tabName) {
+            document.querySelectorAll('.output-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            document.querySelectorAll('.tab-button').forEach(button => {
+                button.classList.remove('active');
+            });
+            
+            document.getElementById(tabName + 'Output').classList.add('active');
+            event.target.classList.add('active');
+        }
+
+        function downloadFile(type) {
+            let content, filename, mimeType;
+            
+            switch(type) {
+                case 'rules':
+                    content = JSON.stringify(processedData.rules, null, 2);
+                    filename = 'dcp_development_rules.json';
+                    mimeType = 'application/json';
+                    break;
+                case 'json':
+                    content = JSON.stringify(processedData.json, null, 2);
+                    filename = 'dcp_complete_analysis.json';
+                    mimeType = 'application/json';
+                    break;
+                case 'summary':
+                    content = processedData.summary;
+                    filename = 'dcp_analysis_summary.txt';
+                    mimeType = 'text/plain';
+                    break;
+                case 'embeddings':
+                    content = JSON.stringify(processedData.embeddings, null, 2);
+                    filename = 'dcp_rule_embeddings.json';
+                    mimeType = 'application/json';
+                    break;
+            }
+            
+            const blob = new Blob([content], { type: mimeType });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        function processAnotherFile() {
+            location.reload();
+        }
+
+        function clearAll() {
+            location.reload();
+        }
+
+        function sleep(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        // Validation functions
+        function validateRules(rules) {
+            const validatedRules = [];
+            const warnings = [];
+            
+            for (const rule of rules) {
+                const validation = validateRule(rule);
+                if (validation.valid) {
+                    validatedRules.push(rule);
+                } else {
+                    warnings.push({
+                        rule: rule,
+                        issues: validation.issues
+                    });
+                }
+            }
+            
+            if (warnings.length > 0) {
+                logMessage(`Validation warnings for ${warnings.length} rules`, 'warning');
+            }
+            
+            return { validatedRules, warnings };
+        }
+
+        function validateRule(rule) {
+            const issues = [];
+            
+            // Check required fields
+            if (!rule.type) issues.push('Missing rule type');
+            if (rule.value === undefined || rule.value === null) issues.push('Missing value');
+            if (!rule.source) issues.push('Missing source');
+            if (!rule.page) issues.push('Missing page number');
+            
+            // Validate value ranges
+            if (rule.unit === '%' && (rule.value < 0 || rule.value > 100)) {
+                issues.push('Percentage value out of range (0-100)');
+            }
+            
+            if (rule.type === 'Fsr' && rule.value > 10) {
+                issues.push('FSR value unusually high (>10)');
+            }
+            
+            if (rule.type === 'Building Height' && rule.unit.includes('m') && rule.value > 200) {
+                issues.push('Building height unusually high (>200m)');
+            }
+            
+            if (rule.type === 'Building Height' && rule.unit.includes('storey') && rule.value > 50) {
+                issues.push('Building height unusually high (>50 storeys)');
+            }
+            
+            // Validate confidence
+            if (rule.confidence < 0 || rule.confidence > 1) {
+                issues.push('Confidence score out of range (0-1)');
+            }
+            
+            return {
+                valid: issues.length === 0,
+                issues: issues
+            };
+        }
+
+        // Performance optimization
+        function optimizeMemoryUsage() {
+            // Clear large objects when not needed
+            if (window.gc) {
+                window.gc();
+            }
+        }
+
+        // Export schema validation
+        function validateOutputSchema(output) {
+            const requiredFields = ['metadata', 'development_rules', 'quality_assurance'];
+            const missing = requiredFields.filter(field => !output.hasOwnProperty(field));
+            
+            if (missing.length > 0) {
+                logMessage(`Schema validation failed: missing ${missing.join(', ')}`, 'error');
+                return false;
+            }
+            
+            // Validate metadata
+            if (!output.metadata.generated || !output.metadata.parser_version) {
+                logMessage('Invalid metadata in output', 'error');
+                return false;
+            }
+            
+            // Validate rules structure
+            if (!Array.isArray(output.development_rules)) {
+                logMessage('Development rules must be an array', 'error');
+                return false;
+            }
+            
+            logMessage('Output schema validation passed', 'success');
+            return true;
+        }
+
+        // Initialize
+        window.addEventListener('load', function() {
+            if (typeof pdfjsLib === 'undefined') {
+                showFileStatus('PDF.js library failed to load. Please check your internet connection.', 'error');
+            } else {
+                logMessage('Advanced DCP Parser initialized successfully', 'success');
+                logMessage('Features: Coordinate-based text reconstruction, table detection, OCR fallback, rule validation', 'info');
+            }
+        });
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', function(e) {
+            if (e.ctrlKey || e.metaKey) {
+                switch(e.key) {
+                    case 'o':
+                        e.preventDefault();
+                        document.getElementById('fileInput').click();
+                        break;
+                    case 's':
+                        e.preventDefault();
+                        if (processedData.rules) {
+                            downloadFile('rules');
+                        }
+                        break;
+                }
+            }
+        });
+
+        // Error handling
+        window.addEventListener('error', function(e) {
+            logMessage(`Unexpected error: ${e.message}`, 'error');
+        });
+
+        window.addEventListener('unhandledrejection', function(e) {
+            logMessage(`Unhandled promise rejection: ${e.reason}`, 'error');
+        });
+    </script>
+</body>
+</html>

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DCP Parser - Advanced Text Extraction</title>
+    <title>DCP Building Envelope Parser</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <style>
         * {
@@ -14,7 +14,7 @@
 
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
             min-height: 100vh;
             padding: 20px;
         }
@@ -38,7 +38,7 @@
             font-size: 2.5rem;
             color: #333;
             margin-bottom: 10px;
-            background: linear-gradient(135deg, #667eea, #764ba2);
+            background: linear-gradient(135deg, #2c3e50, #34495e);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
@@ -47,36 +47,9 @@
         .header p {
             font-size: 1.1rem;
             color: #666;
-            max-width: 700px;
+            max-width: 800px;
             margin: 0 auto;
             line-height: 1.6;
-        }
-
-        .config-section {
-            background: #e3f2fd;
-            border: 1px solid #90caf9;
-            border-radius: 15px;
-            padding: 25px;
-            margin-bottom: 30px;
-        }
-
-        .config-section h3 {
-            color: #1565c0;
-            margin-bottom: 15px;
-        }
-
-        .config-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 20px;
-        }
-
-        .config-input {
-            width: 100%;
-            padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: 6px;
-            font-size: 0.9rem;
         }
 
         .api-section {
@@ -98,27 +71,84 @@
             border: 1px solid #ddd;
             border-radius: 8px;
             font-size: 1rem;
-            margin-bottom: 10px;
+            transition: border-color 0.3s ease;
         }
 
-        .upload-section {
+        .api-input:focus {
+            outline: none;
+            border-color: #3498db;
+            box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
+        }
+
+        .validate-btn {
+            padding: 12px 20px;
+            background: linear-gradient(135deg, #3498db, #2980b9);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.3s ease;
+            white-space: nowrap;
+        }
+
+        .validate-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(52, 152, 219, 0.4);
+        }
+
+        .validate-btn:disabled {
+            background: #95a5a6;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .api-status {
+            margin-top: 15px;
+            padding: 12px 15px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .api-status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .api-status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f1b0b7;
+        }
+
+        .api-status.loading {
+            background: #cce5ff;
+            color: #004085;
+            border: 1px solid #99d6ff;
+        }
+
+        .status-icon {
+            font-size: 1.1rem;
+            font-weight: bold;
+        }
             background: #f8f9fa;
             border-radius: 15px;
             padding: 30px;
             margin-bottom: 30px;
             border: 2px dashed #ddd;
             transition: all 0.3s ease;
+            text-align: center;
         }
 
         .upload-section.dragover {
-            border-color: #667eea;
+            border-color: #2c3e50;
             background: #f0f4ff;
             transform: scale(1.02);
-        }
-
-        .file-input-container {
-            text-align: center;
-            position: relative;
         }
 
         .file-input {
@@ -128,37 +158,18 @@
         .file-input-label {
             display: inline-block;
             padding: 15px 30px;
-            background: linear-gradient(135deg, #667eea, #764ba2);
+            background: linear-gradient(135deg, #2c3e50, #34495e);
             color: white;
             border-radius: 10px;
             cursor: pointer;
             font-size: 1.1rem;
             transition: all 0.3s ease;
-            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+            box-shadow: 0 5px 15px rgba(44, 62, 80, 0.4);
         }
 
         .file-input-label:hover {
             transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.6);
-        }
-
-        .file-status {
-            margin-top: 20px;
-            padding: 15px;
-            border-radius: 10px;
-            display: none;
-        }
-
-        .file-status.success {
-            background: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
-        }
-
-        .file-status.error {
-            background: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f1b0b7;
+            box-shadow: 0 8px 25px rgba(44, 62, 80, 0.6);
         }
 
         .processing-section {
@@ -168,10 +179,6 @@
             padding: 30px;
             margin-bottom: 30px;
             box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
-        }
-
-        .progress-container {
-            margin-bottom: 25px;
         }
 
         .progress-bar {
@@ -185,22 +192,9 @@
 
         .progress-fill {
             height: 100%;
-            background: linear-gradient(90deg, #667eea, #764ba2);
+            background: linear-gradient(90deg, #2c3e50, #34495e);
             width: 0%;
             transition: width 0.3s ease;
-        }
-
-        .progress-details {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            font-size: 0.9rem;
-            color: #666;
-        }
-
-        .current-page {
-            font-weight: 600;
-            color: #333;
         }
 
         .processing-log {
@@ -213,6 +207,7 @@
             font-family: 'Courier New', monospace;
             font-size: 0.85rem;
             line-height: 1.4;
+            margin-top: 15px;
         }
 
         .log-entry {
@@ -220,21 +215,10 @@
             padding: 2px 0;
         }
 
-        .log-entry.info {
-            color: #0066cc;
-        }
-
-        .log-entry.success {
-            color: #28a745;
-        }
-
-        .log-entry.warning {
-            color: #ffc107;
-        }
-
-        .log-entry.error {
-            color: #dc3545;
-        }
+        .log-entry.info { color: #0066cc; }
+        .log-entry.success { color: #28a745; }
+        .log-entry.warning { color: #ffc107; }
+        .log-entry.error { color: #dc3545; }
 
         .results-section {
             display: none;
@@ -246,13 +230,13 @@
 
         .stats-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
             gap: 15px;
             margin-bottom: 30px;
         }
 
         .stat-card {
-            background: linear-gradient(135deg, #ff6b6b, #ee5a24);
+            background: linear-gradient(135deg, #3498db, #2980b9);
             color: white;
             padding: 20px;
             border-radius: 10px;
@@ -265,84 +249,109 @@
             margin-bottom: 5px;
         }
 
-        .stat-label {
-            font-size: 0.9rem;
-            opacity: 0.9;
-        }
-
-        .qa-section {
-            background: #fff8e1;
-            border: 1px solid #ffcc02;
-            border-radius: 10px;
-            padding: 20px;
+        .envelope-controls-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 20px;
             margin-bottom: 30px;
         }
 
-        .qa-section h3 {
-            color: #f57f17;
+        .setback-card {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 10px;
+            padding: 20px;
+        }
+
+        .setback-card h3 {
+            color: #2c3e50;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 8px;
+        }
+
+        .setback-details {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
             margin-bottom: 15px;
         }
 
-        .low-confidence-items {
-            max-height: 200px;
-            overflow-y: auto;
-            background: #fafafa;
-            border-radius: 8px;
-            padding: 15px;
+        .setback-level {
+            background: white;
+            padding: 12px;
+            border-radius: 6px;
+            border-left: 4px solid #3498db;
         }
 
-        .confidence-item {
+        .setback-level .level-name {
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 5px;
+        }
+
+        .setback-level .level-value {
+            color: #e74c3c;
+            font-size: 1.1rem;
+            font-weight: bold;
+        }
+
+        .setback-level .level-source {
+            font-size: 0.8rem;
+            color: #666;
+            margin-top: 5px;
+        }
+
+        .other-controls {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .other-controls h3 {
+            color: #856404;
+            margin-bottom: 15px;
+        }
+
+        .control-item {
             background: white;
-            border-left: 4px solid #ff9800;
-            padding: 10px;
+            padding: 15px;
             margin-bottom: 10px;
-            border-radius: 0 5px 5px 0;
+            border-radius: 8px;
+            border-left: 4px solid #f39c12;
+        }
+
+        .control-title {
+            font-weight: bold;
+            color: #2c3e50;
+        }
+
+        .control-description {
+            color: #666;
+            margin-top: 5px;
+        }
+
+        .control-requirements {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 5px;
+            margin-top: 10px;
+            font-family: 'Courier New', monospace;
             font-size: 0.9rem;
         }
 
-        .confidence-score {
-            font-weight: bold;
-            color: #e65100;
-        }
-
-        .output-tabs {
-            display: flex;
-            margin-bottom: 30px;
+        .output-section {
             background: #f8f9fa;
             border-radius: 10px;
-            padding: 5px;
-            flex-wrap: wrap;
-        }
-
-        .tab-button {
-            flex: 1;
-            padding: 12px 20px;
-            border: none;
-            background: transparent;
-            cursor: pointer;
-            border-radius: 8px;
-            transition: all 0.3s ease;
-            font-weight: 500;
-            min-width: 120px;
-        }
-
-        .tab-button.active {
-            background: linear-gradient(135deg, #667eea, #764ba2);
-            color: white;
-            box-shadow: 0 3px 10px rgba(102, 126, 234, 0.3);
-        }
-
-        .output-content {
-            display: none;
-        }
-
-        .output-content.active {
-            display: block;
+            padding: 20px;
+            margin-top: 30px;
         }
 
         .code-block {
-            background: #f8f9fa;
-            border: 1px solid #e9ecef;
+            background: #2c3e50;
+            color: #ecf0f1;
             border-radius: 8px;
             padding: 20px;
             font-family: 'Courier New', monospace;
@@ -351,35 +360,24 @@
             white-space: pre-wrap;
             max-height: 400px;
             overflow-y: auto;
-            margin-bottom: 20px;
-        }
-
-        .download-buttons {
-            display: flex;
-            gap: 15px;
-            flex-wrap: wrap;
-            margin-top: 20px;
+            margin-top: 15px;
         }
 
         .download-btn {
             padding: 12px 24px;
-            background: linear-gradient(135deg, #28a745, #20c997);
+            background: linear-gradient(135deg, #27ae60, #2ecc71);
             color: white;
             border: none;
             border-radius: 8px;
             cursor: pointer;
             font-size: 1rem;
             transition: all 0.3s ease;
+            margin: 10px 10px 0 0;
         }
 
         .download-btn:hover {
             transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(40, 167, 69, 0.4);
-        }
-
-        .control-buttons {
-            text-align: center;
-            margin-top: 30px;
+            box-shadow: 0 5px 15px rgba(39, 174, 96, 0.4);
         }
 
         .btn {
@@ -393,12 +391,7 @@
         }
 
         .btn-primary {
-            background: linear-gradient(135deg, #667eea, #764ba2);
-            color: white;
-        }
-
-        .btn-secondary {
-            background: #6c757d;
+            background: linear-gradient(135deg, #2c3e50, #34495e);
             color: white;
         }
 
@@ -407,86 +400,67 @@
             box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
         }
 
+        .confidence-indicator {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+
+        .confidence-high { background: #d4edda; color: #155724; }
+        .confidence-medium { background: #fff3cd; color: #856404; }
+        .confidence-low { background: #f8d7da; color: #721c24; }
+
         @media (max-width: 768px) {
-            .container {
-                padding: 20px;
-            }
-            
-            .header h1 {
-                font-size: 2rem;
-            }
-            
-            .progress-details {
-                flex-direction: column;
-                gap: 5px;
-            }
+            .container { padding: 20px; }
+            .header h1 { font-size: 2rem; }
+            .envelope-controls-grid { grid-template-columns: 1fr; }
+            .setback-details { grid-template-columns: 1fr; }
         }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>Advanced DCP Parser</h1>
-            <p>Professional-grade Development Control Plan parser with coordinate-based text reconstruction, table detection, OCR fallback, and comprehensive rule extraction. Handles complex layouts, spaced capitals, and multi-column zone tables.</p>
-        </div>
-
-        <div class="config-section">
-            <h3>Parser Configuration</h3>
-            <div class="config-grid">
-                <div>
-                    <label>Y-Position Tolerance (px):</label>
-                    <input type="number" id="yTolerance" class="config-input" value="3" min="1" max="10">
-                </div>
-                <div>
-                    <label>Column Gap Threshold (px):</label>
-                    <input type="number" id="columnGap" class="config-input" value="20" min="5" max="100">
-                </div>
-                <div>
-                    <label>OCR Confidence Threshold:</label>
-                    <input type="number" id="ocrThreshold" class="config-input" value="60" min="0" max="100">
-                </div>
-                <div>
-                    <label>Min Rule Confidence:</label>
-                    <input type="number" id="minConfidence" class="config-input" value="0.5" min="0" max="1" step="0.1">
-                </div>
-            </div>
+            <h1>Building Envelope Parser</h1>
+            <p>Specialized DCP parser for extracting building envelope controls including front, side, and rear setbacks at different floor levels, plus additional building envelope requirements.</p>
         </div>
 
         <div class="api-section">
             <h3>OpenAI Integration (Optional)</h3>
-            <input type="password" id="apiKey" class="api-input" placeholder="Enter your OpenAI API key (sk-...)">
-            <div class="api-note">
-                API key is used for generating vector embeddings from extracted rules and clean section summaries.
+            <div style="display: grid; grid-template-columns: 1fr auto; gap: 15px; align-items: end;">
+                <div>
+                    <input type="password" id="apiKey" class="api-input" placeholder="Enter your OpenAI API key (sk-...)">
+                    <div class="api-note" style="margin-top: 5px; font-size: 0.85rem; color: #666;">
+                        API key will be validated and used for enhanced rule interpretation and confidence scoring.
+                    </div>
+                </div>
+                <button id="validateApiBtn" class="validate-btn" onclick="validateApiKey()">Validate Key</button>
             </div>
+            <div id="apiStatus" class="api-status" style="display: none;"></div>
         </div>
 
         <div class="upload-section" id="uploadSection">
-            <div class="file-input-container">
-                <input type="file" id="fileInput" class="file-input" accept=".pdf" multiple>
-                <label for="fileInput" class="file-input-label">
-                    Select DCP Files or Drag & Drop
-                </label>
-                <p style="margin-top: 15px; color: #666;">Supports PDF files with text and scanned images</p>
-            </div>
-            <div class="file-status" id="fileStatus"></div>
+            <input type="file" id="fileInput" class="file-input" accept=".pdf" multiple>
+            <label for="fileInput" class="file-input-label">
+                Select DCP Files or Drag & Drop
+            </label>
+            <p style="margin-top: 15px; color: #666;">Upload PDF files containing development control plans</p>
         </div>
 
         <div class="processing-section" id="processingSection">
-            <h2>Processing Your Documents</h2>
-            <div class="progress-container">
-                <div class="progress-bar">
-                    <div class="progress-fill" id="progressFill"></div>
-                </div>
-                <div class="progress-details">
-                    <span class="current-page" id="currentPage">Initializing...</span>
-                    <span id="progressPercent">0%</span>
-                </div>
+            <h2>Processing Documents</h2>
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill"></div>
             </div>
+            <div id="progressText">Initializing...</div>
             <div class="processing-log" id="processingLog"></div>
         </div>
 
         <div class="results-section" id="resultsSection">
-            <h2>Parsing Results</h2>
+            <h2>Building Envelope Controls</h2>
             
             <div class="stats-grid">
                 <div class="stat-card">
@@ -494,222 +468,330 @@
                     <div class="stat-label">Pages Processed</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-number" id="statRules">0</div>
-                    <div class="stat-label">Development Rules</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number" id="statTables">0</div>
-                    <div class="stat-label">Tables Detected</div>
+                    <div class="stat-number" id="statSetbacks">0</div>
+                    <div class="stat-label">Setback Rules</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-number" id="statZones">0</div>
-                    <div class="stat-label">Zoning Areas</div>
+                    <div class="stat-label">Zones Found</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-number" id="statConfidence">0</div>
                     <div class="stat-label">Avg Confidence</div>
                 </div>
-                <div class="stat-card">
-                    <div class="stat-number" id="statOCRPages">0</div>
-                    <div class="stat-label">OCR Pages</div>
+            </div>
+
+            <div class="envelope-controls-grid" id="envelopeGrid">
+                <!-- Setback cards will be populated here -->
+            </div>
+
+            <div class="other-controls" id="otherControls">
+                <h3>Other Building Envelope Controls</h3>
+                <div id="otherControlsList">
+                    <!-- Other controls will be populated here -->
                 </div>
             </div>
 
-            <div class="qa-section" id="qaSection" style="display: none;">
-                <h3>Quality Assurance - Low Confidence Items</h3>
-                <div class="low-confidence-items" id="lowConfidenceItems"></div>
+            <div class="output-section">
+                <h3>JSON Output</h3>
+                <button class="download-btn" onclick="downloadJSON()">Download JSON</button>
+                <button class="download-btn" onclick="downloadCSV()">Download CSV</button>
+                <div class="code-block" id="jsonOutput"></div>
             </div>
 
-            <div class="output-tabs">
-                <button class="tab-button active" onclick="showTab('rules')">Extracted Rules</button>
-                <button class="tab-button" onclick="showTab('json')">Full JSON</button>
-                <button class="tab-button" onclick="showTab('summary')">Summary</button>
-                <button class="tab-button" onclick="showTab('embeddings')">Vector Data</button>
-            </div>
-
-            <div class="output-content active" id="rulesOutput">
-                <h3>Extracted Development Rules</h3>
-                <div class="code-block" id="rulesCode"></div>
-                <div class="download-buttons">
-                    <button class="download-btn" onclick="downloadFile('rules')">Download Rules JSON</button>
-                </div>
-            </div>
-
-            <div class="output-content" id="jsonOutput">
-                <h3>Complete Structured JSON</h3>
-                <div class="code-block" id="jsonCode"></div>
-                <div class="download-buttons">
-                    <button class="download-btn" onclick="downloadFile('json')">Download Full JSON</button>
-                </div>
-            </div>
-
-            <div class="output-content" id="summaryOutput">
-                <h3>Document Analysis Summary</h3>
-                <div class="code-block" id="summaryCode"></div>
-                <div class="download-buttons">
-                    <button class="download-btn" onclick="downloadFile('summary')">Download Summary</button>
-                </div>
-            </div>
-
-            <div class="output-content" id="embeddingsOutput">
-                <h3>Vector Embeddings for AI/ML</h3>
-                <div class="code-block" id="embeddingsCode"></div>
-                <div class="download-buttons">
-                    <button class="download-btn" onclick="downloadFile('embeddings')">Download Vectors</button>
-                </div>
-            </div>
-
-            <div class="control-buttons">
+            <div style="text-align: center; margin-top: 30px;">
                 <button class="btn btn-primary" onclick="processAnotherFile()">Process Another File</button>
-                <button class="btn btn-secondary" onclick="clearAll()">Clear All</button>
             </div>
         </div>
     </div>
 
     <script>
-        // Initialize PDF.js worker
+        // Initialize PDF.js
         if (typeof pdfjsLib !== 'undefined') {
             pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
         }
 
-        let processedData = {};
-        let processingCancelled = false;
-        let parserConfig = {
-            yTolerance: 3,
-            columnGap: 20,
-            ocrThreshold: 60,
-            minConfidence: 0.5
+        let extractedData = {
+            setbacks: {},
+            otherControls: [],
+            zones: [],
+            metadata: {}
         };
 
-        // Configuration for planning controls
-        const PLANNING_CONTROLS = {
-            'landscaped_area': {
+        let apiValidated = false;
+        let openaiApiKey = null;
+
+        // Building envelope pattern definitions
+        const SETBACK_PATTERNS = {
+            front: {
                 patterns: [
-                    /landscap(?:ed?|ing)\s*area/i,
-                    /landscape\s*(?:provision|requirement)/i,
-                    /soft\s*landscap/i
+                    /front\s+setback/i,
+                    /front\s+building\s+line/i,
+                    /street\s+setback/i,
+                    /primary\s+frontage/i,
+                    /front\s+boundary/i
                 ],
-                units: ['%', 'percent', 'm²', 'sqm'],
-                comparators: ['≥', '>=', 'minimum', 'min', 'at least']
+                levels: {
+                    ground: [/ground\s+floor/i, /ground\s+level/i, /at\s+grade/i],
+                    first: [/first\s+floor/i, /upper\s+floor/i, /above\s+ground/i],
+                    upper: [/upper\s+floors/i, /above\s+first/i, /additional\s+floors/i]
+                }
             },
-            'deep_soil': {
+            side: {
                 patterns: [
-                    /deep\s*soil/i,
-                    /deep\s*soil\s*zone/i,
-                    /deep\s*soil\s*area/i
+                    /side\s+setback/i,
+                    /side\s+boundary/i,
+                    /lateral\s+setback/i,
+                    /side\s+spacing/i
                 ],
-                units: ['%', 'percent', 'm²', 'sqm'],
-                comparators: ['≥', '>=', 'minimum', 'min', 'at least']
+                levels: {
+                    ground: [/ground\s+floor/i, /ground\s+level/i],
+                    first: [/first\s+floor/i, /upper\s+floor/i],
+                    upper: [/upper\s+floors/i, /above\s+first/i]
+                }
             },
-            'site_coverage': {
+            rear: {
                 patterns: [
-                    /site\s*coverage/i,
-                    /building\s*coverage/i,
-                    /lot\s*coverage/i,
-                    /coverage\s*ratio/i
+                    /rear\s+setback/i,
+                    /rear\s+boundary/i,
+                    /back\s+setback/i,
+                    /rear\s+building\s+line/i
                 ],
-                units: ['%', 'percent'],
-                comparators: ['≤', '<=', 'maximum', 'max', 'not exceed', 'no more than']
-            },
-            'building_height': {
-                patterns: [
-                    /building\s*height/i,
-                    /maximum\s*height/i,
-                    /height\s*limit/i,
-                    /height\s*control/i
-                ],
-                units: ['m', 'metres', 'meters', 'storeys', 'storey', 'floors', 'floor'],
-                comparators: ['≤', '<=', 'maximum', 'max', 'not exceed', 'no more than']
-            },
-            'fsr': {
-                patterns: [
-                    /floor\s*space\s*ratio/i,
-                    /FSR/,
-                    /gross\s*floor\s*area/i,
-                    /GFA/
-                ],
-                units: [':1', 'ratio'],
-                comparators: ['≤', '<=', 'maximum', 'max', 'not exceed']
-            },
-            'setbacks': {
-                patterns: [
-                    /(?:front|rear|side|boundary)\s*setback/i,
-                    /building\s*separation/i,
-                    /minimum\s*distance/i
-                ],
-                units: ['m', 'metres', 'meters'],
-                comparators: ['≥', '>=', 'minimum', 'min', 'at least']
-            },
-            'private_open_space': {
-                patterns: [
-                    /private\s*open\s*space/i,
-                    /POS/,
-                    /outdoor\s*space/i,
-                    /balcony\s*area/i
-                ],
-                units: ['m²', 'sqm', '%', 'percent'],
-                comparators: ['≥', '>=', 'minimum', 'min', 'at least']
-            },
-            'parking': {
-                patterns: [
-                    /car\s*parking/i,
-                    /vehicle\s*parking/i,
-                    /parking\s*space/i,
-                    /parking\s*requirement/i
-                ],
-                units: ['spaces', 'space', 'per dwelling', 'per unit'],
-                comparators: ['≥', '>=', 'minimum', 'min', 'at least']
+                levels: {
+                    ground: [/ground\s+floor/i, /ground\s+level/i],
+                    first: [/first\s+floor/i, /upper\s+floor/i],
+                    upper: [/upper\s+floors/i, /above\s+first/i]
+                }
             }
         };
 
-        const ZONE_PATTERNS = [
-            /R[1-9][A-Z]?/g,  // R1, R2, R3A, etc.
-            /B[1-9][A-Z]?/g,  // B1, B2, B3A, etc.
-            /IN[1-9][A-Z]?/g, // IN1, IN2, etc.
-            /E[1-9][A-Z]?/g,  // E1, E2, etc.
-            /RE[1-9][A-Z]?/g, // RE1, RE2, etc.
-            /RU[1-9][A-Z]?/g  // RU1, RU2, etc.
-        ];
+        const OTHER_ENVELOPE_CONTROLS = {
+            building_height: {
+                patterns: [
+                    /building\s+height/i,
+                    /maximum\s+height/i,
+                    /height\s+limit/i,
+                    /height\s+control/i
+                ],
+                units: ['m', 'metres', 'meters', 'storeys', 'storey']
+            },
+            floor_space_ratio: {
+                patterns: [
+                    /floor\s+space\s+ratio/i,
+                    /FSR/,
+                    /plot\s+ratio/i
+                ],
+                units: [':1', 'ratio']
+            },
+            site_coverage: {
+                patterns: [
+                    /site\s+coverage/i,
+                    /building\s+coverage/i,
+                    /coverage\s+ratio/i
+                ],
+                units: ['%', 'percent']
+            },
+            building_envelope: {
+                patterns: [
+                    /building\s+envelope/i,
+                    /massing\s+control/i,
+                    /bulk\s+and\s+scale/i
+                ],
+                units: ['various']
+            },
+            solar_access: {
+                patterns: [
+                    /solar\s+access/i,
+                    /overshadowing/i,
+                    /solar\s+protection/i
+                ],
+                units: ['hours', 'degrees']
+            },
+            privacy: {
+                patterns: [
+                    /privacy\s+control/i,
+                    /visual\s+privacy/i,
+                    /overlooking/i,
+                    /screening/i
+                ],
+                units: ['m', 'metres']
+            }
+        };
 
-        // File input handling
+        // File handling
         const fileInput = document.getElementById('fileInput');
         const uploadSection = document.getElementById('uploadSection');
-        const fileStatus = document.getElementById('fileStatus');
 
         fileInput.addEventListener('change', handleFileSelect);
         uploadSection.addEventListener('dragover', handleDragOver);
         uploadSection.addEventListener('drop', handleDrop);
         uploadSection.addEventListener('dragleave', handleDragLeave);
 
-        // Update config when inputs change
-        document.getElementById('yTolerance').addEventListener('change', updateConfig);
-        document.getElementById('columnGap').addEventListener('change', updateConfig);
-        document.getElementById('ocrThreshold').addEventListener('change', updateConfig);
-        document.getElementById('minConfidence').addEventListener('change', updateConfig);
-
-        function updateConfig() {
-            parserConfig = {
-                yTolerance: parseInt(document.getElementById('yTolerance').value),
-                columnGap: parseInt(document.getElementById('columnGap').value),
-                ocrThreshold: parseInt(document.getElementById('ocrThreshold').value),
-                minConfidence: parseFloat(document.getElementById('minConfidence').value)
-            };
-            logMessage('Parser configuration updated', 'info');
-        }
-
-        function handleFileSelect(event) {
-            const files = Array.from(event.target.files);
-            logMessage(`Files selected: ${files.length}`, 'info');
+        async function validateApiKey() {
+            const apiKey = document.getElementById('apiKey').value.trim();
+            const validateBtn = document.getElementById('validateApiBtn');
+            const apiStatus = document.getElementById('apiStatus');
             
-            if (files.length > 0) {
-                const validFiles = files.filter(f => f.type === 'application/pdf');
-                if (validFiles.length === 0) {
-                    showFileStatus('Please select PDF files only', 'error');
-                    return;
+            if (!apiKey) {
+                showApiStatus('Please enter an API key', 'error');
+                return;
+            }
+            
+            if (!apiKey.startsWith('sk-')) {
+                showApiStatus('Invalid API key format. OpenAI keys start with "sk-"', 'error');
+                return;
+            }
+            
+            // Show loading state
+            validateBtn.disabled = true;
+            validateBtn.textContent = 'Validating...';
+            showApiStatus('Validating API key...', 'loading');
+            
+            try {
+                // Test the API key with a simple request
+                const response = await fetch('https://api.openai.com/v1/models', {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${apiKey}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    
+                    // Check if we can access text embedding models
+                    const hasEmbeddingModel = data.data.some(model => 
+                        model.id.includes('text-embedding')
+                    );
+                    
+                    if (hasEmbeddingModel) {
+                        apiValidated = true;
+                        openaiApiKey = apiKey;
+                        showApiStatus('✓ API key validated successfully! Enhanced parsing enabled.', 'success');
+                        logMessage('OpenAI API key validated - enhanced features available', 'success');
+                    } else {
+                        showApiStatus('⚠ API key valid but no embedding models available', 'error');
+                    }
+                } else {
+                    const errorData = await response.json().catch(() => ({}));
+                    let errorMessage = 'API key validation failed';
+                    
+                    if (response.status === 401) {
+                        errorMessage = 'Invalid API key - please check your key';
+                    } else if (response.status === 429) {
+                        errorMessage = 'Rate limit exceeded - please try again later';
+                    } else if (response.status === 403) {
+                        errorMessage = 'API key does not have required permissions';
+                    } else if (errorData.error) {
+                        errorMessage = errorData.error.message || errorMessage;
+                    }
+                    
+                    showApiStatus(`✗ ${errorMessage}`, 'error');
+                    logMessage(`API validation failed: ${errorMessage}`, 'error');
                 }
                 
-                showFileStatus(`Selected ${validFiles.length} PDF file(s)`, 'success');
-                processFiles(validFiles);
+            } catch (error) {
+                console.error('API validation error:', error);
+                showApiStatus('✗ Network error - please check your connection', 'error');
+                logMessage(`API validation error: ${error.message}`, 'error');
+            } finally {
+                validateBtn.disabled = false;
+                validateBtn.textContent = 'Validate Key';
+            }
+        }
+        
+        function showApiStatus(message, type) {
+            const apiStatus = document.getElementById('apiStatus');
+            apiStatus.className = `api-status ${type}`;
+            apiStatus.innerHTML = `<span class="status-icon">${getStatusIcon(type)}</span>${message}`;
+            apiStatus.style.display = 'flex';
+        }
+        
+        function getStatusIcon(type) {
+            switch(type) {
+                case 'success': return '✓';
+                case 'error': return '✗';
+                case 'loading': return '⟳';
+                default: return '';
+            }
+        }
+        
+        async function enhanceRuleWithAI(rule, context) {
+            if (!apiValidated || !openaiApiKey) {
+                return rule; // Return unchanged if no API
+            }
+            
+            try {
+                const prompt = `Analyze this building setback rule from a Development Control Plan and improve its accuracy:
+                
+Context: "${context}"
+Extracted Rule: ${JSON.stringify(rule, null, 2)}
+
+Please verify:
+1. Is the setback type (${rule.type}) correctly identified?
+2. Is the level (${rule.level}) appropriate for the context?
+3. Is the measurement (${rule.value}${rule.unit}) reasonable?
+4. Should the confidence score be adjusted?
+
+Respond with a JSON object containing:
+- verified: true/false
+- suggested_changes: object with any corrections
+- confidence_adjustment: number between -0.3 and +0.3
+- reasoning: brief explanation`;
+
+                const response = await fetch('https://api.openai.com/v1/chat/completions', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${openaiApiKey}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        model: "gpt-3.5-turbo",
+                        messages: [
+                            {
+                                role: "system",
+                                content: "You are an expert in Australian planning law and development control plans. Analyze building setback rules for accuracy."
+                            },
+                            {
+                                role: "user",
+                                content: prompt
+                            }
+                        ],
+                        max_tokens: 500,
+                        temperature: 0.1
+                    })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    const analysis = JSON.parse(data.choices[0].message.content);
+                    
+                    if (analysis.suggested_changes) {
+                        Object.assign(rule, analysis.suggested_changes);
+                    }
+                    
+                    if (analysis.confidence_adjustment) {
+                        rule.confidence = Math.max(0, Math.min(1, 
+                            rule.confidence + analysis.confidence_adjustment
+                        ));
+                    }
+                    
+                    rule.ai_verified = analysis.verified;
+                    rule.ai_reasoning = analysis.reasoning;
+                    
+                    logMessage(`AI enhanced rule: ${rule.type} (${rule.level})`, 'success');
+                }
+                
+            } catch (error) {
+                logMessage(`AI enhancement failed: ${error.message}`, 'warning');
+            }
+            
+            return rule;
+        }
+            const files = Array.from(event.target.files);
+            if (files.length > 0) {
+                processFiles(files);
             }
         }
 
@@ -722,23 +804,13 @@
             event.preventDefault();
             uploadSection.classList.remove('dragover');
             const files = Array.from(event.dataTransfer.files).filter(f => f.type === 'application/pdf');
-            
             if (files.length > 0) {
-                showFileStatus(`Dropped ${files.length} PDF file(s)`, 'success');
                 processFiles(files);
-            } else {
-                showFileStatus('Please drop PDF files only', 'error');
             }
         }
 
         function handleDragLeave(event) {
             uploadSection.classList.remove('dragover');
-        }
-
-        function showFileStatus(message, type) {
-            fileStatus.textContent = message;
-            fileStatus.className = `file-status ${type}`;
-            fileStatus.style.display = 'block';
         }
 
         function logMessage(message, type = 'info') {
@@ -755,382 +827,27 @@
         function updateProgress(current, total, message) {
             const percentage = Math.round((current / total) * 100);
             document.getElementById('progressFill').style.width = percentage + '%';
-            document.getElementById('currentPage').textContent = message;
-            document.getElementById('progressPercent').textContent = percentage + '%';
+            document.getElementById('progressText').textContent = `${message} (${percentage}%)`;
         }
 
-        // Text normalization functions
-        function normalizeText(text) {
-            if (!text) return '';
-            
-            // Collapse spaced capitals: "L A N D S C A P E D" → "LANDSCAPED"
-            text = text.replace(/([A-Z])\s+(?=[A-Z])/g, '$1');
-            
-            // Join hyphenated line breaks
-            text = text.replace(/(\w+)-\s*\n\s*(\w+)/g, '$1$2');
-            
-            // Remove stray spaces in numerals and percentages
-            text = text.replace(/(\d+)\s+(\.\s*\d+)/g, '$1$2');
-            text = text.replace(/(\d+(?:\.\d+)?)\s*%/g, '$1%');
-            text = text.replace(/(\d+(?:\.\d+)?)\s*(m²?|metres?|meters?|storeys?|floors?)/gi, '$1$2');
-            
-            // Standardize comparison operators
-            text = text.replace(/≥|>=|at\s+least|minimum|min/gi, '≥');
-            text = text.replace(/≤|<=|maximum|max|not\s+exceed|no\s+more\s+than/gi, '≤');
-            
-            // Standardize newlines
-            text = text.replace(/\r\n|\r/g, '\n');
-            
-            return text.trim();
-        }
-
-        function reconstructLinesFromCoordinates(textItems) {
-            if (!textItems || textItems.length === 0) return [];
-            
-            // Group items by y-position within tolerance
-            const lineGroups = [];
-            const sortedItems = [...textItems].sort((a, b) => b.transform[5] - a.transform[5]); // Sort by y (top to bottom)
-            
-            for (const item of sortedItems) {
-                const y = item.transform[5];
-                let foundGroup = false;
-                
-                for (const group of lineGroups) {
-                    if (Math.abs(group.y - y) <= parserConfig.yTolerance) {
-                        group.items.push(item);
-                        foundGroup = true;
-                        break;
-                    }
-                }
-                
-                if (!foundGroup) {
-                    lineGroups.push({
-                        y: y,
-                        items: [item]
-                    });
-                }
-            }
-            
-            // Sort items within each line by x-position (left to right)
-            const reconstructedLines = lineGroups.map(group => {
-                const sortedItems = group.items.sort((a, b) => a.transform[4] - b.transform[4]);
-                const lineText = sortedItems.map(item => item.str).join(' ');
-                
-                return {
-                    text: normalizeText(lineText),
-                    y: group.y,
-                    items: sortedItems,
-                    xPositions: sortedItems.map(item => item.transform[4])
-                };
-            });
-            
-            return reconstructedLines.filter(line => line.text.trim().length > 0);
-        }
-
-        function detectTableStructure(lines) {
-            const tables = [];
-            let currentTable = null;
-            
-            for (let i = 0; i < lines.length; i++) {
-                const line = lines[i];
-                const isHeaderRow = detectHeaderRow(line.text);
-                const columnCount = countColumns(line);
-                
-                if (isHeaderRow && columnCount > 1) {
-                    // Start new table
-                    if (currentTable) {
-                        tables.push(currentTable);
-                    }
-                    
-                    currentTable = {
-                        startLine: i,
-                        headerRow: line,
-                        columns: parseColumnStructure(line),
-                        rows: [],
-                        zones: extractZonesFromHeader(line.text)
-                    };
-                    
-                    logMessage(`Table detected: ${line.text.substring(0, 50)}...`, 'info');
-                } else if (currentTable && isDataRow(line, currentTable)) {
-                    // Add data row to current table
-                    const parsedRow = parseTableRow(line, currentTable);
-                    if (parsedRow) {
-                        currentTable.rows.push(parsedRow);
-                    }
-                } else if (currentTable && (columnCount < 2 || isEndOfTable(line))) {
-                    // End current table
-                    tables.push(currentTable);
-                    currentTable = null;
-                }
-            }
-            
-            if (currentTable) {
-                tables.push(currentTable);
-            }
-            
-            return tables;
-        }
-
-        function detectHeaderRow(text) {
-            const headerIndicators = [
-                /zone|development\s*standard|control|requirement/i,
-                /R[1-9]|B[1-9]|E[1-9]|IN[1-9]/,
-                /minimum|maximum|landscap/i,
-                /setback|height|coverage|FSR/i
-            ];
-            
-            return headerIndicators.some(pattern => pattern.test(text));
-        }
-
-        function countColumns(line) {
-            // Count potential columns based on significant gaps in x-positions
-            if (!line.xPositions || line.xPositions.length < 2) return 1;
-            
-            let columns = 1;
-            for (let i = 1; i < line.xPositions.length; i++) {
-                const gap = line.xPositions[i] - line.xPositions[i-1];
-                if (gap > parserConfig.columnGap) {
-                    columns++;
-                }
-            }
-            
-            return columns;
-        }
-
-        function parseColumnStructure(line) {
-            const columns = [];
-            const words = line.text.split(/\s+/);
-            let currentX = 0;
-            
-            for (let i = 0; i < line.items.length; i++) {
-                const item = line.items[i];
-                const x = item.transform[4];
-                
-                if (i === 0 || x - currentX > parserConfig.columnGap) {
-                    columns.push({
-                        x: x,
-                        text: item.str,
-                        width: item.width || 50
-                    });
-                    currentX = x;
-                } else {
-                    // Append to last column
-                    if (columns.length > 0) {
-                        columns[columns.length - 1].text += ' ' + item.str;
-                    }
-                }
-            }
-            
-            return columns;
-        }
-
-        function extractZonesFromHeader(headerText) {
-            const zones = [];
-            
-            for (const pattern of ZONE_PATTERNS) {
-                const matches = headerText.match(pattern);
-                if (matches) {
-                    zones.push(...matches);
-                }
-            }
-            
-            return [...new Set(zones)]; // Remove duplicates
-        }
-
-        function isDataRow(line, table) {
-            // Check if line contains numeric data or planning control keywords
-            const hasNumeric = /\d+(?:\.\d+)?(?:%|m²?|storeys?)/i.test(line.text);
-            const hasControl = Object.values(PLANNING_CONTROLS).some(control => 
-                control.patterns.some(pattern => pattern.test(line.text))
-            );
-            
-            return hasNumeric || hasControl;
-        }
-
-        function parseTableRow(line, table) {
-            const cells = splitRowIntoCells(line, table.columns);
-            const row = {
-                line: line.text,
-                cells: cells,
-                rules: []
-            };
-            
-            // Extract rules from this row
-            const controlType = identifyControlType(cells[0]?.text || '');
-            
-            if (controlType) {
-                // Parse each cell for zone-specific values
-                for (let i = 1; i < cells.length && i - 1 < table.zones.length; i++) {
-                    const cellText = cells[i]?.text || '';
-                    const zone = table.zones[i - 1];
-                    const rule = parseControlValue(cellText, controlType, zone);
-                    
-                    if (rule) {
-                        row.rules.push(rule);
-                    }
-                }
-            }
-            
-            return row;
-        }
-
-        function splitRowIntoCells(line, columns) {
-            const cells = [];
-            
-            for (let i = 0; i < columns.length; i++) {
-                const column = columns[i];
-                const nextColumn = columns[i + 1];
-                
-                const cellItems = line.items.filter(item => {
-                    const x = item.transform[4];
-                    const withinStart = x >= column.x - 10;
-                    const withinEnd = !nextColumn || x < nextColumn.x - 10;
-                    return withinStart && withinEnd;
-                });
-                
-                const cellText = cellItems.map(item => item.str).join(' ').trim();
-                cells.push({
-                    text: normalizeText(cellText),
-                    x: column.x,
-                    items: cellItems
-                });
-            }
-            
-            return cells;
-        }
-
-        function identifyControlType(text) {
-            for (const [type, config] of Object.entries(PLANNING_CONTROLS)) {
-                if (config.patterns.some(pattern => pattern.test(text))) {
-                    return type;
-                }
-            }
-            return null;
-        }
-
-        function parseControlValue(cellText, controlType, zone) {
-            if (!cellText || cellText.trim() === '' || cellText === '-') {
-                return null;
-            }
-            
-            const config = PLANNING_CONTROLS[controlType];
-            if (!config) return null;
-            
-            // Extract numeric value and unit
-            const numericMatch = cellText.match(/(\d+(?:\.\d+)?)\s*([%m²\w]*)/i);
-            if (!numericMatch) return null;
-            
-            const value = parseFloat(numericMatch[1]);
-            const unit = numericMatch[2] || '';
-            
-            // Determine comparator
-            let comparator = '=';
-            for (const comp of config.comparators) {
-                if (cellText.includes(comp) || (config.comparators.includes('≥') && controlType.includes('minimum'))) {
-                    comparator = comp === 'minimum' || comp === 'min' || comp === 'at least' ? '≥' : 
-                                comp === 'maximum' || comp === 'max' || comp === 'not exceed' ? '≤' : comp;
-                    break;
-                }
-            }
-            
-            // Calculate confidence score
-            const confidence = calculateConfidence(cellText, controlType, zone, value, unit);
-            
-            return {
-                type: controlType.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()),
-                zone: zone,
-                value: value,
-                unit: unit,
-                comparator: comparator,
-                source_line: cellText,
-                confidence: confidence
-            };
-        }
-
-        function calculateConfidence(cellText, controlType, zone, value, unit) {
-            let confidence = 0.5; // Base confidence
-            
-            // Increase confidence for clear numeric matches
-            if (/^\d+(?:\.\d+)?[%m²\w]*$/.test(cellText.trim())) {
-                confidence += 0.3;
-            }
-            
-            // Increase confidence for appropriate units
-            const config = PLANNING_CONTROLS[controlType];
-            if (config && config.units.some(u => unit.toLowerCase().includes(u.toLowerCase()))) {
-                confidence += 0.2;
-            }
-            
-            // Increase confidence for valid zone
-            if (ZONE_PATTERNS.some(pattern => pattern.test(zone))) {
-                confidence += 0.1;
-            }
-            
-            // Decrease confidence for suspicious values
-            if ((controlType === 'site_coverage' || controlType === 'landscaped_area') && value > 100) {
-                confidence -= 0.3;
-            }
-            
-            if (controlType === 'fsr' && value > 10) {
-                confidence -= 0.2;
-            }
-            
-            return Math.min(1.0, Math.max(0.0, confidence));
-        }
-
-        function isEndOfTable(line) {
-            const endIndicators = [
-                /^(note|notes?):/i,
-                /^[a-z]/,  // Lines starting with lowercase (likely prose)
-                /^\d+\.\d+/,  // Section numbers
-                /development\s*application/i
-            ];
-            
-            return endIndicators.some(pattern => pattern.test(line.text));
-        }
-
-        // OCR Functions (simplified without Tesseract dependency)
-        async function needsOCR(page) {
-            const textContent = await page.getTextContent();
-            const textLength = textContent.items.reduce((sum, item) => sum + item.str.length, 0);
-            
-            // If very little text extracted, likely needs OCR
-            return textLength < 100;
-        }
-
-        async function performOCR(page) {
-            try {
-                logMessage('Low-text page detected - OCR functionality disabled in this version', 'warning');
-                
-                // For now, return empty result since Tesseract.js was causing issues
-                // In a production environment, you would implement server-side OCR
-                return { 
-                    text: '', 
-                    confidence: 0 
-                };
-                
-            } catch (error) {
-                logMessage(`OCR failed: ${error.message}`, 'error');
-                return { text: '', confidence: 0 };
-            }
-        }
-
-        // Main processing function
         async function processFiles(files) {
-            processingCancelled = false;
-            updateConfig(); // Ensure latest config is used
-            
-            logMessage(`Starting advanced processing of ${files.length} file(s)`, 'info');
-            
             document.getElementById('processingSection').style.display = 'block';
+            document.getElementById('resultsSection').style.display = 'none';
             
-            let totalPages = 0;
-            let allRules = [];
-            let allTables = [];
-            let allSections = [];
-            let totalOCRPages = 0;
-            let lowConfidenceItems = [];
+            logMessage(`Starting processing of ${files.length} file(s)`, 'info');
+            
+            extractedData = {
+                setbacks: {},
+                otherControls: [],
+                zones: [],
+                metadata: {
+                    files: files.map(f => f.name),
+                    processed_at: new Date().toISOString()
+                }
+            };
 
+            let totalPages = 0;
+            
             try {
                 // Count total pages
                 for (const file of files) {
@@ -1138,549 +855,474 @@
                     totalPages += pageCount;
                 }
 
-                let currentPageIndex = 0;
+                let currentPage = 0;
 
                 // Process each file
-                for (let fileIndex = 0; fileIndex < files.length; fileIndex++) {
-                    if (processingCancelled) break;
-                    
-                    const file = files[fileIndex];
+                for (const file of files) {
                     logMessage(`Processing file: ${file.name}`, 'info');
                     
-                    try {
-                        const result = await processFileAdvanced(file, currentPageIndex, totalPages);
-                        
-                        allRules.push(...result.rules);
-                        allTables.push(...result.tables);
-                        allSections.push(...result.sections);
-                        totalOCRPages += result.ocrPages;
-                        
-                        // Filter low confidence items
-                        const lowConfidence = result.rules.filter(rule => 
-                            rule.confidence < parserConfig.minConfidence
-                        );
-                        lowConfidenceItems.push(...lowConfidence);
-                        
-                        currentPageIndex += result.pageCount;
-                        
-                        logMessage(`Completed ${file.name}: ${result.rules.length} rules extracted`, 'success');
-                        
-                    } catch (error) {
-                        logMessage(`Error processing ${file.name}: ${error.message}`, 'error');
-                    }
+                    const pageCount = await processFile(file, currentPage, totalPages);
+                    currentPage += pageCount;
                 }
 
-                if (!processingCancelled) {
-                    // Remove duplicates and reconcile conflicts
-                    const cleanedRules = deduplicateAndReconcile(allRules);
-                    
-                    logMessage('Generating embeddings...', 'info');
-                    updateProgress(currentPageIndex + 2, totalPages + 5, 'Generating embeddings...');
-                    
-                    const apiKey = document.getElementById('apiKey').value.trim();
-                    let embeddingsData;
-                    
-                    if (apiKey && cleanedRules.length > 0) {
-                        try {
-                            embeddingsData = await generateRuleEmbeddings(cleanedRules, apiKey);
-                            logMessage('Vector embeddings generated successfully', 'success');
-                        } catch (error) {
-                            logMessage(`Embedding generation failed: ${error.message}`, 'warning');
-                            embeddingsData = generateSimulatedEmbeddings(cleanedRules);
-                        }
-                    } else {
-                        embeddingsData = generateSimulatedEmbeddings(cleanedRules);
-                    }
-
-                    processedData = generateStructuredOutputs({
-                        files: files.map(f => f.name),
-                        totalPages: currentPageIndex,
-                        rules: cleanedRules,
-                        tables: allTables,
-                        sections: allSections,
-                        embeddings: embeddingsData,
-                        ocrPages: totalOCRPages,
-                        lowConfidenceItems: lowConfidenceItems
-                    });
-
-                    updateProgress(totalPages + 5, totalPages + 5, 'Complete!');
-                    logMessage(`Processing complete! ${cleanedRules.length} rules extracted`, 'success');
-                    
-                    // Update statistics
-                    const avgConfidence = cleanedRules.length > 0 ? 
-                        Math.round((cleanedRules.reduce((sum, rule) => sum + rule.confidence, 0) / cleanedRules.length) * 100) : 0;
-                    
-                    document.getElementById('statPages').textContent = currentPageIndex;
-                    document.getElementById('statRules').textContent = cleanedRules.length;
-                    document.getElementById('statTables').textContent = allTables.length;
-                    document.getElementById('statZones').textContent = [...new Set(cleanedRules.map(r => r.zone))].length;
-                    document.getElementById('statConfidence').textContent = avgConfidence + '%';
-                    document.getElementById('statOCRPages').textContent = totalOCRPages;
-
-                    // Show low confidence items if any
-                    if (lowConfidenceItems.length > 0) {
-                        displayLowConfidenceItems(lowConfidenceItems);
-                    }
-
-                    setTimeout(() => {
-                        document.getElementById('processingSection').style.display = 'none';
-                        document.getElementById('resultsSection').style.display = 'block';
-                        displayResults();
-                    }, 1000);
-                }
+                // Complete processing
+                updateProgress(100, 100, 'Processing complete');
+                logMessage('Processing completed successfully', 'success');
+                
+                setTimeout(() => {
+                    document.getElementById('processingSection').style.display = 'none';
+                    document.getElementById('resultsSection').style.display = 'block';
+                    displayResults();
+                }, 1000);
 
             } catch (error) {
-                logMessage(`Processing failed: ${error.message}`, 'error');
-                showFileStatus(`Processing failed: ${error.message}`, 'error');
+                logMessage(`Error during processing: ${error.message}`, 'error');
             }
         }
 
         async function getPageCount(file) {
             return new Promise((resolve, reject) => {
                 const reader = new FileReader();
-                
                 reader.onload = async function(e) {
                     try {
                         const typedarray = new Uint8Array(e.target.result);
                         const pdf = await pdfjsLib.getDocument({ data: typedarray }).promise;
                         resolve(pdf.numPages);
                     } catch (error) {
-                        reject(new Error(`Failed to count pages: ${error.message}`));
+                        reject(error);
                     }
                 };
-                
-                reader.onerror = () => reject(new Error('Failed to read file'));
                 reader.readAsArrayBuffer(file);
             });
         }
 
-        async function processFileAdvanced(file, startingPageIndex, totalPages) {
+        async function processFile(file, startPage, totalPages) {
             return new Promise((resolve, reject) => {
                 const reader = new FileReader();
-                
                 reader.onload = async function(e) {
                     try {
                         const typedarray = new Uint8Array(e.target.result);
                         const pdf = await pdfjsLib.getDocument({ data: typedarray }).promise;
                         
-                        const rules = [];
-                        const tables = [];
-                        const sections = [];
-                        let ocrPages = 0;
-                        let currentSection = { number: '', title: '' };
-
                         for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-                            if (processingCancelled) break;
+                            updateProgress(startPage + pageNum, totalPages, `Processing ${file.name} - Page ${pageNum}`);
                             
-                            updateProgress(
-                                startingPageIndex + pageNum, 
-                                totalPages, 
-                                `${file.name} - Page ${pageNum}/${pdf.numPages}`
-                            );
-
-                            try {
-                                const page = await pdf.getPage(pageNum);
-                                let textContent = await page.getTextContent();
-                                let pageText = '';
-                                let useAdvancedParsing = true;
-
-                                logMessage(`Page ${pageNum}: Found ${textContent.items.length} text items`, 'info');
-
-                                // Check if we have coordinate data
-                                if (textContent.items.length > 0 && textContent.items[0].transform) {
-                                    // Use advanced coordinate-based parsing
-                                    const lines = reconstructLinesFromCoordinates(textContent.items);
-                                    pageText = lines.map(line => line.text).join('\n');
-                                    
-                                    logMessage(`Page ${pageNum}: Reconstructed ${lines.length} lines`, 'success');
-                                    
-                                    // Detect tables in coordinate-reconstructed text
-                                    const pageTables = detectTableStructure(lines);
-                                    if (pageTables.length > 0) {
-                                        logMessage(`Page ${pageNum}: Found ${pageTables.length} tables`, 'success');
-                                        tables.push(...pageTables.map(table => ({
-                                            ...table,
-                                            page: pageNum,
-                                            source: file.name
-                                        })));
-                                        
-                                        // Extract rules from tables
-                                        for (const table of pageTables) {
-                                            for (const row of table.rows) {
-                                                for (const rule of row.rules) {
-                                                    rules.push({
-                                                        ...rule,
-                                                        page: pageNum,
-                                                        source: file.name,
-                                                        section_number: currentSection.number,
-                                                        section_title: currentSection.title
-                                                    });
-                                                }
-                                            }
-                                        }
-                                    }
-                                } else {
-                                    // Fallback to basic text extraction
-                                    useAdvancedParsing = false;
-                                    logMessage(`Page ${pageNum}: No coordinate data, using basic extraction`, 'warning');
-                                    pageText = textContent.items.map(item => item.str).join(' ');
-                                }
-
-                                // Apply text normalization regardless of extraction method
-                                pageText = normalizeText(pageText);
-                                
-                                logMessage(`Page ${pageNum}: Text length after normalization: ${pageText.length}`, 'info');
-
-                                // OCR is disabled in this version
-                                // if (await needsOCR(page)) { ... }
-
-                                // Track sections across pages
-                                const sectionMatch = pageText.match(/^(\d+(?:\.\d+)*)\s+(.+?)$/m);
-                                if (sectionMatch) {
-                                    currentSection = {
-                                        number: sectionMatch[1],
-                                        title: sectionMatch[2].trim()
-                                    };
-                                    
-                                    sections.push({
-                                        number: currentSection.number,
-                                        title: currentSection.title,
-                                        page: pageNum,
-                                        source: file.name
-                                    });
-                                    
-                                    logMessage(`Page ${pageNum}: Found section ${currentSection.number}`, 'success');
-                                }
-
-                                // Extract rules from prose text as fallback or supplement
-                                const proseRules = extractRulesFromProse(pageText, file.name, pageNum, currentSection);
-                                if (proseRules.length > 0) {
-                                    logMessage(`Page ${pageNum}: Extracted ${proseRules.length} rules from prose`, 'success');
-                                    rules.push(...proseRules);
-                                }
-
-                                await sleep(50); // Prevent UI freezing
-
-                            } catch (pageError) {
-                                logMessage(`Error on page ${pageNum}: ${pageError.message}`, 'error');
-                            }
+                            const page = await pdf.getPage(pageNum);
+                            const textContent = await page.getTextContent();
+                            const pageText = textContent.items.map(item => item.str).join(' ');
+                            
+                            // Extract setbacks and envelope controls from this page
+                            await extractSetbacksFromText(pageText, file.name, pageNum);
+                            extractOtherControlsFromText(pageText, file.name, pageNum);
+                            extractZonesFromText(pageText);
+                            
+                            await sleep(50); // Prevent UI freezing
                         }
-
-                        logMessage(`File processing complete: ${rules.length} total rules extracted`, 'success');
                         
-                        resolve({ 
-                            rules, 
-                            tables, 
-                            sections, 
-                            pageCount: pdf.numPages, 
-                            ocrPages 
-                        });
-                        
+                        resolve(pdf.numPages);
                     } catch (error) {
-                        reject(new Error(`PDF processing failed: ${error.message}`));
+                        reject(error);
                     }
                 };
-                
-                reader.onerror = () => reject(new Error('Failed to read file'));
                 reader.readAsArrayBuffer(file);
             });
         }
 
-        function extractRulesFromProse(text, filename, pageNumber, currentSection) {
-            const rules = [];
-            const normalizedText = normalizeText(text);
+        async function extractSetbacksFromText(text, filename, pageNum) {
+            const normalizedText = text.replace(/\s+/g, ' ').trim();
             
-            // Look for inline development controls
-            const patterns = [
-                /(\w+(?:\s+\w+)*)\s*[:\-]\s*(\d+(?:\.\d+)?)\s*([%m²\w]*)/gi,
-                /(minimum|maximum)\s+(\w+(?:\s+\w+)*)\s+(?:of|is)\s*(\d+(?:\.\d+)?)\s*([%m²\w]*)/gi,
-                /(\w+(?:\s+\w+)*)\s+(?:shall|must)\s+(?:be|not\s+exceed)\s*(\d+(?:\.\d+)?)\s*([%m²\w]*)/gi
-            ];
-            
-            for (const pattern of patterns) {
-                let match;
-                while ((match = pattern.exec(normalizedText)) !== null) {
-                    const controlName = match[1] || match[2];
-                    const value = parseFloat(match[2] || match[3]);
-                    const unit = match[3] || match[4] || '';
+            // Look for setback patterns
+            for (const [setbackType, config] of Object.entries(SETBACK_PATTERNS)) {
+                for (const pattern of config.patterns) {
+                    const matches = [...normalizedText.matchAll(new RegExp(pattern.source + '.*?(?=\\n|$)', 'gi'))];
                     
-                    const controlType = identifyControlType(controlName);
-                    if (controlType && !isNaN(value)) {
-                        const confidence = calculateConfidence(match[0], controlType, '', value, unit);
+                    for (const match of matches) {
+                        const context = extractContextAroundMatch(normalizedText, match.index, 200);
+                        const setbackRules = await parseSetbackRules(context, setbackType, config.levels);
                         
-                        if (confidence >= parserConfig.minConfidence) {
-                            rules.push({
-                                type: controlType.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()),
-                                zone: '',
-                                value: value,
-                                unit: unit,
-                                comparator: match[0].includes('minimum') ? '≥' : 
-                                           match[0].includes('maximum') || match[0].includes('not exceed') ? '≤' : '=',
-                                source_line: match[0],
-                                page: pageNumber,
-                                source: filename,
-                                section_number: currentSection.number,
-                                section_title: currentSection.title,
-                                confidence: confidence
-                            });
+                        if (setbackRules.length > 0) {
+                            if (!extractedData.setbacks[setbackType]) {
+                                extractedData.setbacks[setbackType] = {};
+                            }
+                            
+                            for (const rule of setbackRules) {
+                                const key = `${rule.level}_${rule.zone || 'general'}`;
+                                if (!extractedData.setbacks[setbackType][key] || 
+                                    rule.confidence > extractedData.setbacks[setbackType][key].confidence) {
+                                    extractedData.setbacks[setbackType][key] = {
+                                        ...rule,
+                                        source: filename,
+                                        page: pageNum
+                                    };
+                                }
+                            }
+                            
+                            logMessage(`Found ${setbackType} setback on page ${pageNum}`, 'success');
                         }
                     }
+                }
+            }
+        }
+
+        function extractContextAroundMatch(text, index, contextLength) {
+            const start = Math.max(0, index - contextLength);
+            const end = Math.min(text.length, index + contextLength);
+            return text.substring(start, end);
+        }
+
+        async function parseSetbackRules(context, setbackType, levelConfig) {
+            const rules = [];
+            
+            // Look for measurements in context
+            const measurementPattern = /(\d+(?:\.\d+)?)\s*(m|metres?|meters?)/gi;
+            const measurements = [...context.matchAll(measurementPattern)];
+            
+            if (measurements.length === 0) return rules;
+            
+            // Try to match measurements to levels
+            for (const [level, patterns] of Object.entries(levelConfig)) {
+                for (const pattern of patterns) {
+                    if (pattern.test(context)) {
+                        // Find closest measurement to this level mention
+                        const levelMatch = context.match(pattern);
+                        if (levelMatch) {
+                            const levelIndex = levelMatch.index;
+                            let closestMeasurement = null;
+                            let minDistance = Infinity;
+                            
+                            for (const measurement of measurements) {
+                                const distance = Math.abs(measurement.index - levelIndex);
+                                if (distance < minDistance) {
+                                    minDistance = distance;
+                                    closestMeasurement = measurement;
+                                }
+                            }
+                            
+                            if (closestMeasurement && minDistance < 100) {
+                                let rule = {
+                                    type: setbackType,
+                                    level: level,
+                                    value: parseFloat(closestMeasurement[1]),
+                                    unit: closestMeasurement[2],
+                                    zone: extractZoneFromContext(context),
+                                    confidence: calculateSetbackConfidence(context, setbackType, level),
+                                    source_text: context.substring(
+                                        Math.max(0, closestMeasurement.index - 50),
+                                        Math.min(context.length, closestMeasurement.index + 50)
+                                    ).trim()
+                                };
+                                
+                                // Enhance with AI if available
+                                if (apiValidated) {
+                                    rule = await enhanceRuleWithAI(rule, context);
+                                }
+                                
+                                rules.push(rule);
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // If no level-specific rules found, look for general setback measurements
+            if (rules.length === 0) {
+                for (const measurement of measurements) {
+                    let rule = {
+                        type: setbackType,
+                        level: 'general',
+                        value: parseFloat(measurement[1]),
+                        unit: measurement[2],
+                        zone: extractZoneFromContext(context),
+                        confidence: calculateSetbackConfidence(context, setbackType, 'general'),
+                        source_text: context.substring(
+                            Math.max(0, measurement.index - 50),
+                            Math.min(context.length, measurement.index + 50)
+                        ).trim()
+                    };
+                    
+                    // Enhance with AI if available
+                    if (apiValidated) {
+                        rule = await enhanceRuleWithAI(rule, context);
+                    }
+                    
+                    rules.push(rule);
                 }
             }
             
             return rules;
         }
 
-        function deduplicateAndReconcile(rules) {
-            const ruleMap = new Map();
-            const conflicts = [];
+        function extractOtherControlsFromText(text, filename, pageNum) {
+            const normalizedText = text.replace(/\s+/g, ' ').trim();
             
-            for (const rule of rules) {
-                const key = `${rule.type}_${rule.zone}_${rule.source}`;
-                
-                if (ruleMap.has(key)) {
-                    const existing = ruleMap.get(key);
-                    if (existing.value !== rule.value) {
-                        // Conflict detected
-                        conflicts.push({
-                            type: rule.type,
-                            zone: rule.zone,
-                            values: [existing.value, rule.value],
-                            sources: [existing.source_line, rule.source_line],
-                            confidence: 'conflict'
-                        });
+            for (const [controlType, config] of Object.entries(OTHER_ENVELOPE_CONTROLS)) {
+                for (const pattern of config.patterns) {
+                    const matches = [...normalizedText.matchAll(new RegExp(pattern.source + '.*?(?=\\n|$)', 'gi'))];
+                    
+                    for (const match of matches) {
+                        const context = extractContextAroundMatch(normalizedText, match.index, 150);
+                        const control = parseOtherControl(context, controlType, config.units);
                         
-                        // Keep the one with higher confidence
-                        if (rule.confidence > existing.confidence) {
-                            ruleMap.set(key, { ...rule, conflict: true });
-                        } else {
-                            existing.conflict = true;
+                        if (control) {
+                            control.source = filename;
+                            control.page = pageNum;
+                            extractedData.otherControls.push(control);
+                            logMessage(`Found ${controlType} control on page ${pageNum}`, 'success');
                         }
                     }
-                } else {
-                    ruleMap.set(key, rule);
+                }
+            }
+        }
+
+        function parseOtherControl(context, controlType, units) {
+            // Look for numeric values with appropriate units
+            const patterns = units.map(unit => 
+                new RegExp(`(\\d+(?:\\.\\d+)?)\\s*${unit.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'gi')
+            );
+            
+            for (const pattern of patterns) {
+                const match = context.match(pattern);
+                if (match) {
+                    return {
+                        type: controlType.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+                        description: context.trim(),
+                        value: parseFloat(match[1]),
+                        unit: match[0].replace(match[1], '').trim(),
+                        zone: extractZoneFromContext(context),
+                        confidence: calculateControlConfidence(context, controlType)
+                    };
                 }
             }
             
-            if (conflicts.length > 0) {
-                logMessage(`Found ${conflicts.length} rule conflicts`, 'warning');
-            }
-            
-            return Array.from(ruleMap.values());
+            // If no specific value found, return general description
+            return {
+                type: controlType.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+                description: context.trim(),
+                value: null,
+                unit: null,
+                zone: extractZoneFromContext(context),
+                confidence: 0.3
+            };
         }
 
-        async function generateRuleEmbeddings(rules, apiKey) {
-            const embeddings = [];
+        function extractZoneFromContext(context) {
+            const zonePatterns = [
+                /\b(R[1-9][A-Z]?|B[1-9][A-Z]?|IN[1-9][A-Z]?|E[1-9][A-Z]?|RE[1-9][A-Z]?|RU[1-9][A-Z]?)\b/g
+            ];
             
-            // Create semantic chunks from rules
-            const ruleChunks = rules.slice(0, 10).map(rule => {
-                return `${rule.type} (${rule.zone || 'General'}): ${rule.comparator} ${rule.value}${rule.unit} - Section ${rule.section_number || 'N/A'} ${rule.section_title || ''}`;
-            });
+            for (const pattern of zonePatterns) {
+                const match = context.match(pattern);
+                if (match) {
+                    return match[0];
+                }
+            }
+            return null;
+        }
+
+        function extractZonesFromText(text) {
+            const zonePatterns = [
+                /\b(R[1-9][A-Z]?|B[1-9][A-Z]?|IN[1-9][A-Z]?|E[1-9][A-Z]?|RE[1-9][A-Z]?|RU[1-9][A-Z]?)\b/g
+            ];
             
-            for (let i = 0; i < ruleChunks.length; i++) {
-                try {
-                    const response = await fetch('https://api.openai.com/v1/embeddings', {
-                        method: 'POST',
-                        headers: {
-                            'Authorization': `Bearer ${apiKey}`,
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({
-                            model: "text-embedding-3-small",
-                            input: ruleChunks[i],
-                            encoding_format: "float"
-                        })
-                    });
-                    
-                    if (!response.ok) {
-                        throw new Error(`API Error: ${response.statusText}`);
+            for (const pattern of zonePatterns) {
+                const matches = [...text.matchAll(pattern)];
+                for (const match of matches) {
+                    if (!extractedData.zones.includes(match[0])) {
+                        extractedData.zones.push(match[0]);
                     }
-                    
-                    const data = await response.json();
-                    
-                    embeddings.push({
-                        chunk_id: `rule_${i}`,
-                        text: ruleChunks[i],
-                        vector: data.data[0].embedding,
-                        metadata: {
-                            rule_type: rules[i].type,
-                            zone: rules[i].zone,
-                            page: rules[i].page,
-                            section: rules[i].section_number,
-                            confidence: rules[i].confidence
-                        }
-                    });
-                    
-                    await sleep(200);
-                    
-                } catch (error) {
-                    console.error('Embedding generation failed:', error);
-                    throw error;
                 }
             }
-            
-            return {
-                embedding_model: "text-embedding-3-small",
-                vector_dimensions: 1536,
-                total_chunks: embeddings.length,
-                embeddings: embeddings
-            };
         }
 
-        function generateSimulatedEmbeddings(rules) {
-            return {
-                embedding_model: "simulated",
-                vector_dimensions: 1536,
-                total_chunks: Math.min(rules.length, 10),
-                embeddings: rules.slice(0, 10).map((rule, index) => ({
-                    chunk_id: `rule_${index}`,
-                    text: `${rule.type} (${rule.zone || 'General'}): ${rule.comparator} ${rule.value}${rule.unit}`,
-                    vector: Array.from({length: 1536}, () => Math.random().toFixed(6)),
-                    metadata: {
-                        rule_type: rule.type,
-                        zone: rule.zone,
-                        page: rule.page,
-                        section: rule.section_number,
-                        confidence: rule.confidence
-                    }
-                }))
-            };
+        function calculateSetbackConfidence(context, setbackType, level) {
+            let confidence = 0.5;
+            
+            // Higher confidence for explicit setback mentions
+            if (context.toLowerCase().includes(setbackType + ' setback')) {
+                confidence += 0.2;
+            }
+            
+            // Higher confidence for level-specific mentions
+            if (level !== 'general' && context.toLowerCase().includes(level)) {
+                confidence += 0.2;
+            }
+            
+            // Higher confidence for clear numeric values
+            if (/\d+(\.\d+)?\s*m/.test(context)) {
+                confidence += 0.1;
+            }
+            
+            // Lower confidence for ambiguous contexts
+            if (context.length < 50) {
+                confidence -= 0.1;
+            }
+            
+            return Math.min(1.0, Math.max(0.1, confidence));
         }
 
-        function generateStructuredOutputs(data) {
-            const timestamp = new Date().toISOString();
+        function calculateControlConfidence(context, controlType) {
+            let confidence = 0.4;
             
-            const jsonOutput = {
-                metadata: {
-                    generated: timestamp,
-                    files_processed: data.files,
-                    total_pages: data.totalPages,
-                    parser_version: "2.0.0",
-                    parser_config: parserConfig,
-                    ocr_pages: data.ocrPages
-                },
-                development_rules: data.rules,
-                tables_detected: data.tables.length,
-                sections: data.sections,
-                embeddings: data.embeddings,
-                quality_assurance: {
-                    total_rules: data.rules.length,
-                    high_confidence_rules: data.rules.filter(r => r.confidence >= 0.8).length,
-                    low_confidence_rules: data.lowConfidenceItems.length,
-                    average_confidence: data.rules.length > 0 ? 
-                        data.rules.reduce((sum, rule) => sum + rule.confidence, 0) / data.rules.length : 0
-                }
-            };
-
-            const summaryOutput = `ADVANCED DCP ANALYSIS SUMMARY
-Generated: ${timestamp}
-
-FILES PROCESSED: ${data.files.join(', ')}
-Total Pages: ${data.totalPages}
-OCR Pages: ${data.ocrPages}
-Tables Detected: ${data.tables.length}
-Development Rules: ${data.rules.length}
-Sections: ${data.sections.length}
-
-RULE QUALITY:
-High Confidence (≥0.8): ${data.rules.filter(r => r.confidence >= 0.8).length}
-Medium Confidence (0.5-0.8): ${data.rules.filter(r => r.confidence >= 0.5 && r.confidence < 0.8).length}
-Low Confidence (<0.5): ${data.lowConfidenceItems.length}
-Average Confidence: ${(data.rules.reduce((sum, rule) => sum + rule.confidence, 0) / data.rules.length * 100).toFixed(1)}%
-
-ZONES DETECTED: ${[...new Set(data.rules.map(r => r.zone))].filter(z => z).join(', ')}
-
-CONTROL TYPES FOUND:
-${Object.entries(data.rules.reduce((acc, rule) => {
-    acc[rule.type] = (acc[rule.type] || 0) + 1;
-    return acc;
-}, {})).map(([type, count]) => `• ${type}: ${count} rules`).join('\n')}
-
-PARSER CONFIGURATION:
-Y-Tolerance: ${parserConfig.yTolerance}px
-Column Gap: ${parserConfig.columnGap}px
-OCR Threshold: ${parserConfig.ocrThreshold}%
-Min Confidence: ${parserConfig.minConfidence}`;
-
-            return {
-                json: jsonOutput,
-                rules: data.rules,
-                summary: summaryOutput,
-                embeddings: data.embeddings
-            };
-        }
-
-        function displayLowConfidenceItems(items) {
-            const qaSection = document.getElementById('qaSection');
-            const container = document.getElementById('lowConfidenceItems');
+            // Higher confidence for explicit control type mentions
+            if (context.toLowerCase().includes(controlType.replace(/_/g, ' '))) {
+                confidence += 0.2;
+            }
             
-            container.innerHTML = '';
+            // Higher confidence for numeric values
+            if (/\d+/.test(context)) {
+                confidence += 0.2;
+            }
             
-            items.forEach((item, index) => {
-                const div = document.createElement('div');
-                div.className = 'confidence-item';
-                div.innerHTML = `
-                    <div><strong>${item.type}</strong> ${item.zone ? `(${item.zone})` : ''}</div>
-                    <div>Value: ${item.value}${item.unit}</div>
-                    <div>Source: "${item.source_line}"</div>
-                    <div>Page: ${item.page} | <span class="confidence-score">Confidence: ${Math.round(item.confidence * 100)}%</span></div>
-                `;
-                container.appendChild(div);
-            });
+            // Higher confidence for longer, more detailed contexts
+            if (context.length > 100) {
+                confidence += 0.1;
+            }
             
-            qaSection.style.display = 'block';
+            return Math.min(1.0, Math.max(0.1, confidence));
         }
 
         function displayResults() {
-            document.getElementById('rulesCode').textContent = JSON.stringify(processedData.rules, null, 2);
-            document.getElementById('jsonCode').textContent = JSON.stringify(processedData.json, null, 2);
-            document.getElementById('summaryCode').textContent = processedData.summary;
-            document.getElementById('embeddingsCode').textContent = JSON.stringify(processedData.embeddings, null, 2);
+            // Update statistics
+            const totalSetbacks = Object.values(extractedData.setbacks)
+                .reduce((sum, setbackType) => sum + Object.keys(setbackType).length, 0);
+            
+            const allRules = [
+                ...Object.values(extractedData.setbacks).flatMap(st => Object.values(st)),
+                ...extractedData.otherControls
+            ];
+            
+            const avgConfidence = allRules.length > 0 ? 
+                Math.round(allRules.reduce((sum, rule) => sum + (rule.confidence || 0), 0) / allRules.length * 100) : 0;
+            
+            document.getElementById('statPages').textContent = extractedData.metadata.total_pages || 0;
+            document.getElementById('statSetbacks').textContent = totalSetbacks;
+            document.getElementById('statZones').textContent = extractedData.zones.length;
+            document.getElementById('statConfidence').textContent = avgConfidence + '%';
+            
+            // Display setback cards
+            displaySetbackCards();
+            
+            // Display other controls
+            displayOtherControls();
+            
+            // Display JSON output
+            document.getElementById('jsonOutput').textContent = JSON.stringify(extractedData, null, 2);
         }
 
-        function showTab(tabName) {
-            document.querySelectorAll('.output-content').forEach(content => {
-                content.classList.remove('active');
-            });
-            document.querySelectorAll('.tab-button').forEach(button => {
-                button.classList.remove('active');
-            });
+        function displaySetbackCards() {
+            const grid = document.getElementById('envelopeGrid');
+            grid.innerHTML = '';
             
-            document.getElementById(tabName + 'Output').classList.add('active');
-            event.target.classList.add('active');
-        }
-
-        function downloadFile(type) {
-            let content, filename, mimeType;
-            
-            switch(type) {
-                case 'rules':
-                    content = JSON.stringify(processedData.rules, null, 2);
-                    filename = 'dcp_development_rules.json';
-                    mimeType = 'application/json';
-                    break;
-                case 'json':
-                    content = JSON.stringify(processedData.json, null, 2);
-                    filename = 'dcp_complete_analysis.json';
-                    mimeType = 'application/json';
-                    break;
-                case 'summary':
-                    content = processedData.summary;
-                    filename = 'dcp_analysis_summary.txt';
-                    mimeType = 'text/plain';
-                    break;
-                case 'embeddings':
-                    content = JSON.stringify(processedData.embeddings, null, 2);
-                    filename = 'dcp_rule_embeddings.json';
-                    mimeType = 'application/json';
-                    break;
+            for (const [setbackType, setbacks] of Object.entries(extractedData.setbacks)) {
+                if (Object.keys(setbacks).length === 0) continue;
+                
+                const card = document.createElement('div');
+                card.className = 'setback-card';
+                
+                const title = setbackType.charAt(0).toUpperCase() + setbackType.slice(1) + ' Setbacks';
+                
+                let cardHTML = `<h3>${title}</h3><div class="setback-details">`;
+                
+                for (const [key, setback] of Object.entries(setbacks)) {
+                    const confidenceClass = getConfidenceClass(setback.confidence);
+                    const levelDisplay = setback.level === 'general' ? 'All Levels' : 
+                        setback.level.charAt(0).toUpperCase() + setback.level.slice(1) + ' Floor';
+                    
+                    cardHTML += `
+                        <div class="setback-level">
+                            <div class="level-name">${levelDisplay}</div>
+                            <div class="level-value">${setback.value || 'N/A'}${setback.unit || ''}</div>
+                            <div class="level-source">Zone: ${setback.zone || 'General'}</div>
+                            <span class="confidence-indicator ${confidenceClass}">
+                                ${Math.round((setback.confidence || 0) * 100)}%
+                            </span>
+                        </div>
+                    `;
+                }
+                
+                cardHTML += '</div>';
+                card.innerHTML = cardHTML;
+                grid.appendChild(card);
             }
             
-            const blob = new Blob([content], { type: mimeType });
+            if (grid.children.length === 0) {
+                grid.innerHTML = '<div style="text-align: center; padding: 40px; color: #666;">No setback rules found in the uploaded documents.</div>';
+            }
+        }
+
+        function displayOtherControls() {
+            const container = document.getElementById('otherControlsList');
+            container.innerHTML = '';
+            
+            if (extractedData.otherControls.length === 0) {
+                container.innerHTML = '<div style="text-align: center; padding: 20px; color: #666;">No additional envelope controls found.</div>';
+                return;
+            }
+            
+            for (const control of extractedData.otherControls) {
+                const confidenceClass = getConfidenceClass(control.confidence);
+                
+                const controlDiv = document.createElement('div');
+                controlDiv.className = 'control-item';
+                
+                controlDiv.innerHTML = `
+                    <div class="control-title">
+                        ${control.type}
+                        <span class="confidence-indicator ${confidenceClass}">
+                            ${Math.round((control.confidence || 0) * 100)}%
+                        </span>
+                    </div>
+                    <div class="control-description">${control.description}</div>
+                    ${control.value ? `<div class="control-requirements">Value: ${control.value}${control.unit || ''}</div>` : ''}
+                    <div style="margin-top: 8px; font-size: 0.8rem; color: #666;">
+                        Zone: ${control.zone || 'General'} | Page: ${control.page} | Source: ${control.source}
+                    </div>
+                `;
+                
+                container.appendChild(controlDiv);
+            }
+        }
+
+        function getConfidenceClass(confidence) {
+            if (confidence >= 0.7) return 'confidence-high';
+            if (confidence >= 0.4) return 'confidence-medium';
+            return 'confidence-low';
+        }
+
+        function downloadJSON() {
+            const jsonData = JSON.stringify(extractedData, null, 2);
+            const blob = new Blob([jsonData], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = filename;
+            a.download = 'building_envelope_controls.json';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        function downloadCSV() {
+            let csvContent = 'Type,Level,Value,Unit,Zone,Confidence,Source,Page,Source Text\n';
+            
+            // Add setback data
+            for (const [setbackType, setbacks] of Object.entries(extractedData.setbacks)) {
+                for (const [key, setback] of Object.entries(setbacks)) {
+                    csvContent += `"${setbackType} setback","${setback.level}","${setback.value || ''}","${setback.unit || ''}","${setback.zone || ''}","${setback.confidence || 0}","${setback.source || ''}","${setback.page || ''}","${(setback.source_text || '').replace(/"/g, '""')}"\n`;
+                }
+            }
+            
+            // Add other controls
+            for (const control of extractedData.otherControls) {
+                csvContent += `"${control.type}","","${control.value || ''}","${control.unit || ''}","${control.zone || ''}","${control.confidence || 0}","${control.source || ''}","${control.page || ''}","${(control.description || '').replace(/"/g, '""')}"\n`;
+            }
+            
+            const blob = new Blob([csvContent], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'building_envelope_controls.csv';
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
@@ -1691,144 +1333,22 @@ Min Confidence: ${parserConfig.minConfidence}`;
             location.reload();
         }
 
-        function clearAll() {
-            location.reload();
-        }
-
         function sleep(ms) {
             return new Promise(resolve => setTimeout(resolve, ms));
-        }
-
-        // Validation functions
-        function validateRules(rules) {
-            const validatedRules = [];
-            const warnings = [];
-            
-            for (const rule of rules) {
-                const validation = validateRule(rule);
-                if (validation.valid) {
-                    validatedRules.push(rule);
-                } else {
-                    warnings.push({
-                        rule: rule,
-                        issues: validation.issues
-                    });
-                }
-            }
-            
-            if (warnings.length > 0) {
-                logMessage(`Validation warnings for ${warnings.length} rules`, 'warning');
-            }
-            
-            return { validatedRules, warnings };
-        }
-
-        function validateRule(rule) {
-            const issues = [];
-            
-            // Check required fields
-            if (!rule.type) issues.push('Missing rule type');
-            if (rule.value === undefined || rule.value === null) issues.push('Missing value');
-            if (!rule.source) issues.push('Missing source');
-            if (!rule.page) issues.push('Missing page number');
-            
-            // Validate value ranges
-            if (rule.unit === '%' && (rule.value < 0 || rule.value > 100)) {
-                issues.push('Percentage value out of range (0-100)');
-            }
-            
-            if (rule.type === 'Fsr' && rule.value > 10) {
-                issues.push('FSR value unusually high (>10)');
-            }
-            
-            if (rule.type === 'Building Height' && rule.unit.includes('m') && rule.value > 200) {
-                issues.push('Building height unusually high (>200m)');
-            }
-            
-            if (rule.type === 'Building Height' && rule.unit.includes('storey') && rule.value > 50) {
-                issues.push('Building height unusually high (>50 storeys)');
-            }
-            
-            // Validate confidence
-            if (rule.confidence < 0 || rule.confidence > 1) {
-                issues.push('Confidence score out of range (0-1)');
-            }
-            
-            return {
-                valid: issues.length === 0,
-                issues: issues
-            };
-        }
-
-        // Performance optimization
-        function optimizeMemoryUsage() {
-            // Clear large objects when not needed
-            if (window.gc) {
-                window.gc();
-            }
-        }
-
-        // Export schema validation
-        function validateOutputSchema(output) {
-            const requiredFields = ['metadata', 'development_rules', 'quality_assurance'];
-            const missing = requiredFields.filter(field => !output.hasOwnProperty(field));
-            
-            if (missing.length > 0) {
-                logMessage(`Schema validation failed: missing ${missing.join(', ')}`, 'error');
-                return false;
-            }
-            
-            // Validate metadata
-            if (!output.metadata.generated || !output.metadata.parser_version) {
-                logMessage('Invalid metadata in output', 'error');
-                return false;
-            }
-            
-            // Validate rules structure
-            if (!Array.isArray(output.development_rules)) {
-                logMessage('Development rules must be an array', 'error');
-                return false;
-            }
-            
-            logMessage('Output schema validation passed', 'success');
-            return true;
         }
 
         // Initialize
         window.addEventListener('load', function() {
             if (typeof pdfjsLib === 'undefined') {
-                showFileStatus('PDF.js library failed to load. Please check your internet connection.', 'error');
+                alert('PDF.js library failed to load. Please check your internet connection.');
             } else {
-                logMessage('Advanced DCP Parser initialized successfully', 'success');
-                logMessage('Features: Coordinate-based text reconstruction, table detection, OCR fallback, rule validation', 'info');
-            }
-        });
-
-        // Keyboard shortcuts
-        document.addEventListener('keydown', function(e) {
-            if (e.ctrlKey || e.metaKey) {
-                switch(e.key) {
-                    case 'o':
-                        e.preventDefault();
-                        document.getElementById('fileInput').click();
-                        break;
-                    case 's':
-                        e.preventDefault();
-                        if (processedData.rules) {
-                            downloadFile('rules');
-                        }
-                        break;
-                }
+                logMessage('Building Envelope Parser initialized', 'success');
             }
         });
 
         // Error handling
         window.addEventListener('error', function(e) {
-            logMessage(`Unexpected error: ${e.message}`, 'error');
-        });
-
-        window.addEventListener('unhandledrejection', function(e) {
-            logMessage(`Unhandled promise rejection: ${e.reason}`, 'error');
+            logMessage(`Error: ${e.message}`, 'error');
         });
     </script>
 </body>
